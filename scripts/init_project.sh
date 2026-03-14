@@ -66,6 +66,6 @@ python3 "$repo_root/scripts/guard.py" init-state "$project_slug" --title "$proje
 
 echo "Created project: $project_dir"
 echo "Next:"
-echo "1. Tell Codex which project to work on"
+echo "1. Tell Claude Code which project to work on"
 echo "2. Start from intake or idea fission"
 echo "3. Keep total files and stage_logs in sync"

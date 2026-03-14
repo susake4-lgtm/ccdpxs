@@ -86,7 +86,7 @@ def utc_now() -> str:
 
 
 def slugify(value: str) -> str:
-    normalized = re.sub(r"[^A-Za-z0-9._-]+", "-", value.strip().lower())
+    normalized = re.sub(r"[^A-Za-z0-9\u4e00-\u9fff._-]+", "-", value.strip().lower())
     normalized = re.sub(r"-{2,}", "-", normalized).strip("-._")
     return normalized or "entry"
 
@@ -258,7 +258,12 @@ def validate_project_files(project_root: Path) -> list[str]:
     return missing
 
 
-def blockers_for_target(project_root: Path, state: dict[str, Any], target_stage: str) -> list[str]:
+def blockers_for_target(
+    project_root: Path,
+    state: dict[str, Any],
+    target_stage: str,
+    skip_log_check: bool = False,
+) -> list[str]:
     blockers: list[str] = []
     current_stage = require_valid_stage(state["current_stage"])
     current_index = STAGE_INDEX[current_stage]
@@ -287,9 +292,10 @@ def blockers_for_target(project_root: Path, state: dict[str, Any], target_stage:
         if not file_exists(project_root, relative_path):
             blockers.append(f"Missing required file or directory for {stage_to_validate}: {relative_path}")
 
-    required_log_stage = "intake" if stage_to_validate == "premise_test" else stage_to_validate
-    if not stage_has_log(project_root, required_log_stage):
-        blockers.append(f"Missing non-placeholder stage log in {STAGE_LOG_DIRS[required_log_stage]}")
+    if not skip_log_check:
+        required_log_stage = "intake" if stage_to_validate == "premise_test" else stage_to_validate
+        if not stage_has_log(project_root, required_log_stage):
+            blockers.append(f"Missing non-placeholder stage log in {STAGE_LOG_DIRS[required_log_stage]}")
 
     return blockers
 
@@ -619,7 +625,7 @@ def command_advance(args: argparse.Namespace) -> int:
             f"Error: advance only accepts the next stage; use rewind for backwards movement. Current: {current_stage}"
         )
 
-    blockers = blockers_for_target(project_root, state, target_stage)
+    blockers = blockers_for_target(project_root, state, target_stage, skip_log_check=args.skip_log_check)
     if blockers:
         print("Blocked:")
         for item in blockers:
@@ -965,6 +971,7 @@ def build_parser() -> argparse.ArgumentParser:
     advance.add_argument("project")
     advance.add_argument("stage", choices=STAGES)
     advance.add_argument("--note")
+    advance.add_argument("--skip-log-check", action="store_true", help="Skip stage_logs file check")
     advance.set_defaults(func=command_advance)
 
     rewind = subparsers.add_parser("rewind", help="Rewind to previous stage, a named stage, or a step number")

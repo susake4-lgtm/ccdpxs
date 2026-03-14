@@ -50,8 +50,8 @@
 # 查看项目状态
 python3 scripts/guard.py status <project>
 
-# 推进到下一阶段
-python3 scripts/guard.py advance <project>
+# 推进到指定阶段（必须手动指定目标阶段，用户确认后才能推进）
+python3 scripts/guard.py advance <project> <stage>
 
 # 确认当前阶段
 python3 scripts/guard.py confirm <project>
