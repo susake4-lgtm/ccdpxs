@@ -285,12 +285,17 @@ HTTP_PROXY="http://127.0.0.1:7897" HTTPS_PROXY="http://127.0.0.1:7897" git push 
 
 开始工作前，默认执行以下顺序：
 
-1. 先阅读本文件（CLAUDE.md）。
-2. 按"进入项目后的默认读取顺序"按需加载框架文档。
-3. 确认当前分支不是 `main`（如果在 `main`，先切到工作分支）。
-4. 查看当前工作区是否已有未提交改动。
-5. 根据用户任务，先定义本次要完成的 milestone。
-6. 仅在 milestone 边界执行 commit、push。
+1. 先阅读本文件（CLAUDE.md，自动加载）。
+2. `guard.py status <project>` 确认当前阶段。
+3. `guard.py context <current-stage>` 确认本阶段需要读什么文档。
+4. 只读需要的文档章节（不全量加载所有框架文档）。
+5. 确认当前分支不是 `main`（如果在 `main`，先切到工作分支）。
+6. 查看当前工作区是否已有未提交改动。
+7. 根据用户任务，先定义本次要完成的 milestone。
+8. 仅在 milestone 边界执行 commit、push。
+
+如需查询阶段入口/出口条件：`guard.py stage-info <stage>`。
+如需查询停止条件和确认门槛：`guard.py rules`。
 
 ## 输出风格
 

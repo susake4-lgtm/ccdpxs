@@ -73,10 +73,7 @@ output/<project>/
 - 已知约束与待澄清问题
 - `stage_logs/00_intake/` 单轮归档
 
-退出条件：
-- 已经能用一句话说明"这次要写什么"
-- 知道这次更看重更炸、更稳，还是两者平衡
-- 压力测试检查通过（`guard.py run-checks <project> intake` → 全部填写完成）
+退出条件：`guard.py stage-info intake`
 
 ## 阶段 0.3：Killer Test（脑洞粗筛）
 
@@ -88,7 +85,7 @@ output/<project>/
 
 产出：`00_Killer_Test.md` + `stage_logs/00_killer-test/` 单轮归档
 
-退出条件：Killer Test 通过（6-8 分），或脑洞被 freeze。压力测试检查通过（聚合评分 ≥ 6）。
+退出条件：`guard.py stage-info killer_test`
 
 ## 阶段 0.5：前提因果校验（Premise Pressure Test）
 
@@ -109,10 +106,7 @@ output/<project>/
 - 是否值得继续裂变
 - 归档到 `stage_logs/00_intake/`
 
-退出条件：
-- 以上五问至少有一套基本自洽的答案
-- 或者明确判定"当前脑洞先不值得继续包装"，转入框架调试或脑洞重建
-- 压力测试检查通过（`guard.py run-checks <project> premise_test` → 全部填写完成）
+退出条件：`guard.py stage-info premise_test`
 
 ## 阶段 1：脑洞裂变（Idea Fission）
 
@@ -135,9 +129,7 @@ output/<project>/
 - `stage_logs/01_idea-fission/` 单轮归档
 - 推荐方向与推荐理由
 
-退出条件：
-- 用户选定一个方向，或明确修正某个方向后继续
-- 当前前提已经通过因果校验，否则不进入本阶段
+退出条件：`guard.py stage-info idea_fission`
 
 ## 阶段 2：方向评估（Evaluation）
 
@@ -154,9 +146,7 @@ output/<project>/
 - `stage_logs/02_evaluation/` 单轮归档
 - 当前轮结论：继续、回改、暂停
 
-退出条件：
-- 已能说清主角想要什么、阻力从哪里来、最容易失真的点在哪里
-- 压力测试检查通过（`guard.py run-checks <project> evaluation` → 全部填写完成）
+退出条件：`guard.py stage-info evaluation`
 
 ## 阶段 3：结构方案（Structure）
 
@@ -173,11 +163,7 @@ output/<project>/
 - `02_Structure.md`（含情绪曲线、人物行为模式、核心 motif/设定清单）
 - `stage_logs/03_structure/` 单轮归档
 
-退出条件：
-- 用户认可整体结构思路
-- 关键钩子和中段推进逻辑已经稳定
-- 情绪曲线的 5 个节点已确认，自检通过
-- 压力测试检查通过（`guard.py run-checks <project> structure` → 全部填写完成）
+退出条件：`guard.py stage-info structure`
 
 ## 阶段 4：详细大纲（Outline）
 
@@ -194,10 +180,7 @@ output/<project>/
 - `03_Outline.md`（含每场景时间线、情绪位置入/出、认知差追踪表）
 - `stage_logs/04_outline/` 单轮归档
 
-退出条件：
-- 用户认可推进顺序和信息揭露节奏
-- 已能清楚回答"每一章写什么，为什么写"
-- 压力测试检查通过（`guard.py run-checks <project> outline` → 全部填写完成）
+退出条件：`guard.py stage-info outline`
 
 ## 阶段 4.5：Scene Pressure Test（场景压力测试）
 
@@ -209,7 +192,7 @@ output/<project>/
 
 产出：`stage_logs/04_scene-pressure-test/` 单轮归档
 
-退出条件：关键场景全部 >= 4 分，用户确认后进入 Prototype。压力测试检查通过（聚合评分 ≥ 7）。
+退出条件：`guard.py stage-info scene_pressure_test`
 
 ## 阶段 5：Prototype
 
@@ -225,10 +208,7 @@ output/<project>/
 - `04_Prototype.md`
 - `stage_logs/05_prototype/` 单轮归档
 
-退出条件：
-- Prototype 已经证明故事可放大
-- 没有明显提纲腔、便利转折和角色工具化
-- 压力测试检查通过（`guard.py run-checks <project> prototype` → 全部填写完成）
+退出条件：`guard.py stage-info prototype`
 
 ## 阶段 6：场景化扩写（Expansion）
 
@@ -246,9 +226,7 @@ output/<project>/
 - `stage_logs/06_expansion/` 单轮归档
 - 按需要同步到 `chapters/` 下的章节总文件
 
-退出条件：
-- 当前单元读感成立，且用户确认继续下一单元
-- 每章扩写后压力测试通过（`guard.py check-chapter <project> <chapter_num>` → 全部填写完成）
+退出条件：`guard.py stage-info expansion`
 
 ## 阶段 7：结构与读感复核（Review）
 
