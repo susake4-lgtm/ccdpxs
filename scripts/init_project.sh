@@ -48,6 +48,8 @@ fi
 
 mkdir -p "$output_root"
 cp -R "$template_dir/." "$project_dir"
+# Knowledge is global (repo-root/knowledge/); remove per-project knowledge if template has it
+rm -rf "$project_dir/knowledge"
 
 cat > "$project_dir/PROJECT_INFO.md" <<EOF
 # Project Info

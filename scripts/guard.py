@@ -10,14 +10,21 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+# Ensure scripts/ directory is on sys.path for cross-imports (check_defs, check_engine)
+_SCRIPTS_DIR = str(Path(__file__).resolve().parent)
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPTS_DIR)
+
 
 STAGES = [
     "intake",
+    "killer_test",
     "premise_test",
     "idea_fission",
     "evaluation",
     "structure",
     "outline",
+    "scene_pressure_test",
     "prototype",
     "expansion",
     "review",
@@ -27,11 +34,17 @@ STAGE_INDEX = {stage: index + 1 for index, stage in enumerate(STAGES)}
 ALLOWED_MODES = {"writing", "debug"}
 KNOWLEDGE_KINDS = {"idea", "lesson", "risk", "rejection", "rule", "fragment"}
 REVIEW_ACTIONS = {"保留", "丢弃", "稍后"}
-DEFAULT_STATE_VERSION = 3
+DEFAULT_STATE_VERSION = 5
+
+# Stages at or before which the global knowledge base may be consulted.
+# After KNOWLEDGE_READ_CUTOFF_STAGE, knowledge is write-only (output only, no reading).
+KNOWLEDGE_READ_CUTOFF_STAGE = "structure"
+
 
 REQUIRED_PROJECT_PATHS = [
     "PROJECT_INFO.md",
     "00_Brainstorm.md",
+    "00_Killer_Test.md",
     "00_Creative_Chat_Log.md",
     "01_Evaluation_Log.md",
     "02_Structure.md",
@@ -39,21 +52,17 @@ REQUIRED_PROJECT_PATHS = [
     "04_Prototype.md",
     "chapters",
     "stage_logs",
-    "knowledge",
-    "knowledge/candidates",
-    "knowledge/candidates/index.json",
-    "knowledge/reviews",
-    "knowledge/entries",
-    "knowledge/entries/index.json",
 ]
 
 STAGE_LOG_DIRS = {
     "intake": "stage_logs/00_intake",
+    "killer_test": "stage_logs/00_killer-test",
     "premise_test": "stage_logs/00_intake",
     "idea_fission": "stage_logs/01_idea-fission",
     "evaluation": "stage_logs/02_evaluation",
     "structure": "stage_logs/03_structure",
     "outline": "stage_logs/04_outline",
+    "scene_pressure_test": "stage_logs/04_scene-pressure-test",
     "prototype": "stage_logs/05_prototype",
     "expansion": "stage_logs/06_expansion",
     "review": "stage_logs/07_review",
@@ -61,11 +70,13 @@ STAGE_LOG_DIRS = {
 
 TOTAL_STAGE_FILES = {
     "intake": ["00_Brainstorm.md", "00_Creative_Chat_Log.md"],
+    "killer_test": ["00_Killer_Test.md", "00_Creative_Chat_Log.md"],
     "premise_test": ["00_Brainstorm.md", "00_Creative_Chat_Log.md"],
     "idea_fission": ["00_Brainstorm.md", "00_Creative_Chat_Log.md"],
     "evaluation": ["01_Evaluation_Log.md", "00_Creative_Chat_Log.md"],
     "structure": ["02_Structure.md", "00_Creative_Chat_Log.md"],
     "outline": ["03_Outline.md", "00_Creative_Chat_Log.md"],
+    "scene_pressure_test": ["03_Outline.md", "00_Creative_Chat_Log.md"],
     "prototype": ["04_Prototype.md", "00_Creative_Chat_Log.md"],
     "expansion": ["00_Creative_Chat_Log.md", "chapters"],
     "review": ["00_Creative_Chat_Log.md"],
@@ -76,6 +87,7 @@ GATE_CONFIRMATION_STAGES = {
     "evaluation",
     "structure",
     "outline",
+    "scene_pressure_test",
     "prototype",
     "expansion",
 }
@@ -102,6 +114,8 @@ def default_state(project_slug: str, project_title: str | None = None) -> dict[s
         "project_title": project_title or project_slug,
         "mode": "writing",
         "current_stage": "intake",
+        "killer_test_passed": False,
+        "killer_test_attempts": 0,
         "premise_test_passed": False,
         "confirmations": {stage: False for stage in GATE_CONFIRMATION_STAGES},
         "stage_history": [
@@ -127,28 +141,32 @@ def state_path(project_slug: str) -> Path:
     return project_dir(project_slug) / "project_state.json"
 
 
-def knowledge_root(project_root: Path) -> Path:
-    return project_root / "knowledge"
+# ---------------------------------------------------------------------------
+# Global knowledge base (repo-level, shared across all projects)
+# ---------------------------------------------------------------------------
+
+def knowledge_root() -> Path:
+    return repo_root() / "knowledge"
 
 
-def candidates_dir(project_root: Path) -> Path:
-    return knowledge_root(project_root) / "candidates"
+def candidates_dir() -> Path:
+    return knowledge_root() / "candidates"
 
 
-def candidates_index_path(project_root: Path) -> Path:
-    return candidates_dir(project_root) / "index.json"
+def candidates_index_path() -> Path:
+    return candidates_dir() / "index.json"
 
 
-def entries_dir(project_root: Path) -> Path:
-    return knowledge_root(project_root) / "entries"
+def entries_dir() -> Path:
+    return knowledge_root() / "entries"
 
 
-def entries_index_path(project_root: Path) -> Path:
-    return entries_dir(project_root) / "index.json"
+def entries_index_path() -> Path:
+    return entries_dir() / "index.json"
 
 
-def reviews_dir(project_root: Path) -> Path:
-    return knowledge_root(project_root) / "reviews"
+def reviews_dir() -> Path:
+    return knowledge_root() / "reviews"
 
 
 def ensure_project_exists(project_slug: str) -> Path:
@@ -178,11 +196,14 @@ def normalize_state(state: dict[str, Any]) -> dict[str, Any]:
     state.setdefault("project_title", state["project_slug"])
     state.setdefault("mode", "writing")
     state.setdefault("current_stage", "intake")
+    state.setdefault("killer_test_passed", False)
+    state.setdefault("killer_test_attempts", 0)
     state.setdefault("premise_test_passed", False)
     confirmations = state.setdefault("confirmations", {})
     for stage in GATE_CONFIRMATION_STAGES:
         confirmations.setdefault(stage, False)
     state.setdefault("stage_history", [])
+    state.setdefault("checks", {})
     return state
 
 
@@ -250,6 +271,16 @@ def stage_has_log(project_root: Path, stage: str) -> bool:
     return False
 
 
+def chat_log_has_content(project_root: Path) -> bool:
+    """Return True if 00_Creative_Chat_Log.md has at least one recorded decision."""
+    log_path = project_root / "00_Creative_Chat_Log.md"
+    if not log_path.exists():
+        return False
+    content = log_path.read_text(encoding="utf-8")
+    # Require at least one non-empty 关键决策 line
+    return bool(re.search(r"^- 关键决策[：:]\s*\S", content, re.MULTILINE))
+
+
 def validate_project_files(project_root: Path) -> list[str]:
     missing: list[str] = []
     for relative_path in REQUIRED_PROJECT_PATHS:
@@ -278,7 +309,19 @@ def blockers_for_target(
     if target_index < current_index:
         return blockers
 
-    if target_stage in {"idea_fission", "evaluation", "structure", "outline", "prototype", "expansion", "review"}:
+    # Killer test gate: must pass before entering premise_test or later
+    if target_stage in {
+        "premise_test", "idea_fission", "evaluation", "structure",
+        "outline", "scene_pressure_test", "prototype", "expansion", "review",
+    }:
+        if not state.get("killer_test_passed", False):
+            blockers.append("Premise killer test has not passed yet.")
+
+    # Premise test gate: must pass before entering idea_fission or later
+    if target_stage in {
+        "idea_fission", "evaluation", "structure", "outline",
+        "scene_pressure_test", "prototype", "expansion", "review",
+    }:
         if not state.get("premise_test_passed", False):
             blockers.append("Premise pressure test has not passed yet.")
 
@@ -297,44 +340,55 @@ def blockers_for_target(
         if not stage_has_log(project_root, required_log_stage):
             blockers.append(f"Missing non-placeholder stage log in {STAGE_LOG_DIRS[required_log_stage]}")
 
+    # Chat log content check: 00_Creative_Chat_Log.md must have at least one recorded decision
+    if not chat_log_has_content(project_root):
+        blockers.append(
+            "00_Creative_Chat_Log.md has no recorded decisions yet. "
+            "Add at least one '- 关键决策: <content>' entry before advancing."
+        )
+
+    # 检查压力测试是否完成（仅当检查会话已启动时）
+    from check_engine import check_blockers_for_advance
+    check_blocks = check_blockers_for_advance(state, current_stage)
+    blockers.extend(check_blocks)
+
     return blockers
 
 
-def ensure_knowledge_base(project_root: Path) -> None:
-    root = knowledge_root(project_root)
-    candidate_root = candidates_dir(project_root)
-    entry_root = entries_dir(project_root)
-    review_root = reviews_dir(project_root)
-    legacy_index = root / "index.json"
+def ensure_knowledge_base() -> None:
+    """Ensure the global (repo-level) knowledge base directories and index files exist."""
+    root = knowledge_root()
+    candidate_root = candidates_dir()
+    entry_root = entries_dir()
+    review_root = reviews_dir()
 
     root.mkdir(parents=True, exist_ok=True)
     candidate_root.mkdir(parents=True, exist_ok=True)
     entry_root.mkdir(parents=True, exist_ok=True)
     review_root.mkdir(parents=True, exist_ok=True)
 
-    candidate_index = candidates_index_path(project_root)
+    candidate_index = candidates_index_path()
     if not candidate_index.exists():
         write_json_file(candidate_index, [])
 
-    entry_index = entries_index_path(project_root)
+    entry_index = entries_index_path()
     if not entry_index.exists():
-        if legacy_index.exists():
-            legacy_payload = read_json_file(legacy_index, [])
-            if isinstance(legacy_payload, list):
-                write_json_file(entry_index, legacy_payload)
-            else:
-                write_json_file(entry_index, [])
-        else:
-            write_json_file(entry_index, [])
+        write_json_file(entry_index, [])
 
     readme = root / "README.md"
     if not readme.exists():
         readme.write_text(
-            "# Knowledge\n\n"
-            "这里按三层维护知识：候选、审核、正式知识。\n\n"
-            "1. `candidates/`：候选条目，允许粗糙。\n"
+            "# 全局知识库\n\n"
+            "跨项目积累的创作规律、失败经验和可复用片段。\n\n"
+            "## 三层结构\n\n"
+            "1. `candidates/`：LLM 汇总输出的候选条目，允许粗糙。\n"
             "2. `reviews/`：筛选文档，用中文标记保留、丢弃、合并、稍后。\n"
-            "3. `entries/`：正式知识库，只放确认过的高价值内容。\n",
+            "3. `entries/`：正式知识库，只放用户确认过的高价值内容。\n\n"
+            "## 调用规则\n\n"
+            "- **02 Structure 及之前**：可读取 `entries/` 辅助方向判断。\n"
+            "- **03 Outline 及之后**：只写入（capture），不读取，避免污染当前故事的内部一致性。\n\n"
+            "## 来源\n\n"
+            "知识来自各项目的 `00_Creative_Chat_Log.md`，由用户主动触发汇总后进入候选层。\n",
             encoding="utf-8",
         )
 
@@ -346,25 +400,26 @@ def load_index(index_path: Path, label: str) -> list[dict[str, Any]]:
     return raw
 
 
-def read_candidates(project_root: Path) -> list[dict[str, Any]]:
-    ensure_knowledge_base(project_root)
-    return load_index(candidates_index_path(project_root), "candidate")
+def read_candidates() -> list[dict[str, Any]]:
+    ensure_knowledge_base()
+    return load_index(candidates_index_path(), "candidate")
 
 
-def write_candidates(project_root: Path, payload: list[dict[str, Any]]) -> None:
-    write_json_file(candidates_index_path(project_root), payload)
+def write_candidates(payload: list[dict[str, Any]]) -> None:
+    write_json_file(candidates_index_path(), payload)
 
 
-def read_entries(project_root: Path) -> list[dict[str, Any]]:
-    ensure_knowledge_base(project_root)
-    return load_index(entries_index_path(project_root), "entry")
+def read_entries() -> list[dict[str, Any]]:
+    ensure_knowledge_base()
+    return load_index(entries_index_path(), "entry")
 
 
-def write_entries(project_root: Path, payload: list[dict[str, Any]]) -> None:
-    write_json_file(entries_index_path(project_root), payload)
+def write_entries(payload: list[dict[str, Any]]) -> None:
+    write_json_file(entries_index_path(), payload)
 
 
-def validate_source_paths(project_root: Path, sources: list[str]) -> list[str]:
+def validate_source_paths(project_root: Path, project_slug: str, sources: list[str]) -> list[str]:
+    """Validate source paths (relative to project root) and return repo-relative forms."""
     normalized_sources: list[str] = []
     for raw_source in sources:
         source_path = Path(raw_source)
@@ -377,7 +432,8 @@ def validate_source_paths(project_root: Path, sources: list[str]) -> list[str]:
             raise SystemExit(f"Error: source path escapes project root: {raw_source}") from exc
         if not resolved.exists():
             raise SystemExit(f"Error: missing source path: {raw_source}")
-        normalized_sources.append(str(source_path))
+        # Store as repo-relative path for provenance clarity
+        normalized_sources.append(f"output/{project_slug}/{source_path}")
     return normalized_sources
 
 
@@ -388,13 +444,14 @@ def format_candidate_markdown(candidate: dict[str, Any]) -> str:
         f"- 候选ID: {candidate['id']}",
         f"- 类型: {candidate['kind']}",
         f"- 阶段: {candidate['stage']}",
+        f"- 来源项目: {candidate.get('project_slug', '—')}",
         f"- 创建时间: {candidate['created_at']}",
         f"- 当前状态: {candidate['status']}",
     ]
     if candidate.get("tags"):
         lines.append(f"- 标签: {', '.join(candidate['tags'])}")
     if candidate.get("sources"):
-        lines.append(f"- 来源: {', '.join(f'`{item}`' for item in candidate['sources'])}")
+        lines.append(f"- 来源文件: {', '.join(f'`{item}`' for item in candidate['sources'])}")
     lines.extend(["", "## 摘要", "", candidate["summary"]])
     if candidate.get("note"):
         lines.extend(["", "## 备注", "", candidate["note"]])
@@ -409,12 +466,13 @@ def format_entry_markdown(entry: dict[str, Any]) -> str:
         f"- 来源候选ID: {entry['source_candidate_id']}",
         f"- 类型: {entry['kind']}",
         f"- 阶段: {entry['stage']}",
+        f"- 来源项目: {entry.get('project_slug', '—')}",
         f"- 收录时间: {entry['created_at']}",
     ]
     if entry.get("tags"):
         lines.append(f"- 标签: {', '.join(entry['tags'])}")
     if entry.get("sources"):
-        lines.append(f"- 来源: {', '.join(f'`{item}`' for item in entry['sources'])}")
+        lines.append(f"- 来源文件: {', '.join(f'`{item}`' for item in entry['sources'])}")
     lines.extend(["", "## 摘要", "", entry["summary"]])
     if entry.get("note"):
         lines.extend(["", "## 备注", "", entry["note"]])
@@ -470,9 +528,19 @@ def parse_review_file(review_path: Path) -> tuple[list[dict[str, Any]], str]:
     return parsed, content
 
 
+
+def print_knowledge_hint(stage: str) -> None:
+    cutoff_index = STAGE_INDEX[KNOWLEDGE_READ_CUTOFF_STAGE]
+    stage_index = STAGE_INDEX[stage]
+    if stage_index <= cutoff_index:
+        print(f"[Knowledge] 当前阶段可读取全局知识库 knowledge/entries/")
+    else:
+        print(f"[Knowledge] 当前阶段只写入知识库，不读取（避免污染故事内部一致性）")
+
+
 def command_init_state(args: argparse.Namespace) -> int:
     project_root = ensure_project_exists(args.project)
-    ensure_knowledge_base(project_root)
+    ensure_knowledge_base()
     path = state_path(args.project)
     if path.exists() and not args.force:
         raise SystemExit(f"Error: state file already exists: {path}")
@@ -489,18 +557,21 @@ def command_init_state(args: argparse.Namespace) -> int:
 
 def command_status(args: argparse.Namespace) -> int:
     project_root = ensure_project_exists(args.project)
-    ensure_knowledge_base(project_root)
+    ensure_knowledge_base()
     state = read_state(args.project)
     missing = validate_project_files(project_root)
-    candidates = read_candidates(project_root)
-    entries = read_entries(project_root)
+    candidates = read_candidates()
+    entries = read_entries()
 
+    current_stage = state["current_stage"]
     print(f"Project: {args.project}")
     print(f"Mode: {state['mode']}")
-    print(f"Current stage: {state['current_stage']} (step {STAGE_INDEX[state['current_stage']]})")
+    print(f"Current stage: {current_stage} (step {STAGE_INDEX[current_stage]})")
+    print(f"Killer test passed: {'yes' if state.get('killer_test_passed') else 'no'}"
+          f" (attempts: {state.get('killer_test_attempts', 0)}/2)")
     print(f"Premise test passed: {'yes' if state.get('premise_test_passed') else 'no'}")
-    print(f"Knowledge candidates: {len(candidates)}")
-    print(f"Knowledge entries: {len(entries)}")
+    print(f"Global knowledge candidates: {len(candidates)}")
+    print(f"Global knowledge entries: {len(entries)}")
     print("Confirmations:")
     for stage in STAGES:
         if stage in GATE_CONFIRMATION_STAGES:
@@ -520,12 +591,14 @@ def command_status(args: argparse.Namespace) -> int:
             note = event.get("note", "")
             suffix = f" | {note}" if note else ""
             print(f"  - {event['timestamp']} | {event['action']} | {event['stage']}{suffix}")
+
+
+    print_knowledge_hint(current_stage)
     return 0
 
 
 def command_check(args: argparse.Namespace) -> int:
     project_root = ensure_project_exists(args.project)
-    ensure_knowledge_base(project_root)
     state = read_state(args.project)
     target_stage = require_valid_stage(args.target or state["current_stage"])
 
@@ -559,9 +632,38 @@ def command_set_mode(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_set_killer_test(args: argparse.Namespace) -> int:
+    project_root = ensure_project_exists(args.project)
+    state = read_state(args.project)
+    passed = args.result == "pass"
+
+    attempts = state.get("killer_test_attempts", 0) + 1
+    state["killer_test_attempts"] = attempts
+    state["killer_test_passed"] = passed
+
+    if passed and STAGE_INDEX[state["current_stage"]] < STAGE_INDEX["killer_test"]:
+        state["current_stage"] = "killer_test"
+
+    note = args.note
+    if not note:
+        if passed:
+            note = f"Killer test passed (attempt {attempts})"
+        elif attempts >= 2:
+            note = f"Killer test failed (attempt {attempts}) — recommend freeze"
+        else:
+            note = f"Killer test failed (attempt {attempts}) — rewrite allowed"
+
+    append_history(state, "killer_test", "killer_test", note)
+    write_state(args.project, state)
+
+    print(f"Killer test: {'passed' if passed else 'failed'} (attempt {attempts}/2)")
+    if not passed and attempts >= 2:
+        print("Warning: max attempts reached. Consider freezing this brainstorm.")
+    return 0
+
+
 def command_set_premise(args: argparse.Namespace) -> int:
     project_root = ensure_project_exists(args.project)
-    ensure_knowledge_base(project_root)
     state = read_state(args.project)
     passed = args.result == "pass"
     state["premise_test_passed"] = passed
@@ -613,7 +715,7 @@ def clear_future_confirmations(state: dict[str, Any], current_stage: str) -> Non
 
 def command_advance(args: argparse.Namespace) -> int:
     project_root = ensure_project_exists(args.project)
-    ensure_knowledge_base(project_root)
+    ensure_knowledge_base()
     state = read_state(args.project)
     target_stage = require_valid_stage(args.stage)
     current_stage = require_valid_stage(state["current_stage"])
@@ -638,6 +740,8 @@ def command_advance(args: argparse.Namespace) -> int:
     append_history(state, "advance", target_stage, args.note or f"Advanced from {previous_stage} to {target_stage}")
     write_state(args.project, state)
     print(f"Advanced to {target_stage}")
+
+    print_knowledge_hint(target_stage)
     return 0
 
 
@@ -654,6 +758,9 @@ def command_rewind(args: argparse.Namespace) -> int:
     previous_stage = current_stage
     state["current_stage"] = target_stage
     clear_future_confirmations(state, target_stage)
+    if STAGE_INDEX[target_stage] < STAGE_INDEX["killer_test"]:
+        state["killer_test_passed"] = False
+        state["killer_test_attempts"] = 0
     if STAGE_INDEX[target_stage] < STAGE_INDEX["premise_test"]:
         state["premise_test_passed"] = False
     append_history(
@@ -665,24 +772,26 @@ def command_rewind(args: argparse.Namespace) -> int:
     write_state(args.project, state)
     print(f"Rewound to {target_stage} (step {STAGE_INDEX[target_stage]})")
     print("Note: rewind is non-destructive; previous files and logs are preserved.")
+
+    print_knowledge_hint(target_stage)
     return 0
 
 
 def command_capture(args: argparse.Namespace) -> int:
     project_root = ensure_project_exists(args.project)
-    ensure_knowledge_base(project_root)
+    ensure_knowledge_base()
     state = read_state(args.project)
     stage = require_valid_stage(args.stage or state["current_stage"])
     kind = args.kind.lower()
     if kind not in KNOWLEDGE_KINDS:
         raise SystemExit(f"Error: unknown knowledge kind: {kind}")
 
-    sources = validate_source_paths(project_root, args.source or [])
-    candidates = read_candidates(project_root)
+    sources = validate_source_paths(project_root, args.project, args.source or [])
+    candidates = read_candidates()
     candidate_id = next_numeric_id(candidates)
     filename = f"{candidate_id:03d}_{kind}_{slugify(args.title)}.md"
     relative_path = Path("knowledge") / "candidates" / filename
-    absolute_path = project_root / relative_path
+    absolute_path = repo_root() / relative_path
 
     tags = [tag.strip() for tag in (args.tag or []) if tag.strip()]
     summary = args.summary.strip()
@@ -694,6 +803,7 @@ def command_capture(args: argparse.Namespace) -> int:
         "title": args.title,
         "kind": kind,
         "stage": stage,
+        "project_slug": args.project,
         "summary": summary,
         "note": note,
         "tags": tags,
@@ -705,7 +815,7 @@ def command_capture(args: argparse.Namespace) -> int:
     }
     absolute_path.write_text(format_candidate_markdown(candidate), encoding="utf-8")
     candidates.append(candidate)
-    write_candidates(project_root, candidates)
+    write_candidates(candidates)
 
     append_history(
         state,
@@ -719,18 +829,21 @@ def command_capture(args: argparse.Namespace) -> int:
 
 
 def command_review_create(args: argparse.Namespace) -> int:
-    project_root = ensure_project_exists(args.project)
-    ensure_knowledge_base(project_root)
-    state = read_state(args.project)
-    candidates = read_candidates(project_root)
+    ensure_knowledge_base()
+    candidates = read_candidates()
+
+    # Filter by project if specified
+    pool = candidates
+    if args.project:
+        pool = [c for c in candidates if c.get("project_slug") == args.project]
 
     selected: list[dict[str, Any]] = []
     if args.id:
         requested_ids = {int(value) for value in args.id}
         for candidate_id in requested_ids:
-            selected.append(ensure_candidate_by_id(candidates, candidate_id))
+            selected.append(ensure_candidate_by_id(pool, candidate_id))
     else:
-        for candidate in candidates:
+        for candidate in pool:
             if candidate.get("status") in {"待审", "稍后"}:
                 selected.append(candidate)
 
@@ -738,7 +851,7 @@ def command_review_create(args: argparse.Namespace) -> int:
     if not selected:
         raise SystemExit("Error: no candidate entries available for review")
 
-    existing_reviews = sorted(reviews_dir(project_root).glob("*.md"))
+    existing_reviews = sorted(reviews_dir().glob("*.md"))
     review_id = 1
     if existing_reviews:
         numeric_ids = []
@@ -751,7 +864,7 @@ def command_review_create(args: argparse.Namespace) -> int:
 
     filename = f"{review_id:03d}_candidate-review.md"
     relative_path = Path("knowledge") / "reviews" / filename
-    absolute_path = project_root / relative_path
+    absolute_path = repo_root() / relative_path
 
     lines = [
         f"# 知识候选筛选 {review_id:03d}",
@@ -777,13 +890,14 @@ def command_review_create(args: argparse.Namespace) -> int:
                 f"- 标题: {candidate['title']}",
                 f"- 类型: {candidate['kind']}",
                 f"- 阶段: {candidate['stage']}",
+                f"- 来源项目: {candidate.get('project_slug', '—')}",
                 f"- 当前状态: {candidate['status']}",
             ]
         )
         if candidate.get("tags"):
             lines.append(f"- 标签: {', '.join(candidate['tags'])}")
         if candidate.get("sources"):
-            lines.append(f"- 来源: {', '.join(candidate['sources'])}")
+            lines.append(f"- 来源文件: {', '.join(candidate['sources'])}")
         lines.extend(
             [
                 f"- 摘要: {candidate['summary']}",
@@ -796,24 +910,26 @@ def command_review_create(args: argparse.Namespace) -> int:
         )
 
     absolute_path.write_text("\n".join(lines), encoding="utf-8")
-    append_history(state, "review_create", state["current_stage"], f"Created review doc: {relative_path}")
-    write_state(args.project, state)
+
+    if args.project:
+        state = read_state(args.project)
+        append_history(state, "review_create", state["current_stage"], f"Created review doc: {relative_path}")
+        write_state(args.project, state)
+
     print(f"Created review doc: {relative_path}")
     return 0
 
 
 def command_review_apply(args: argparse.Namespace) -> int:
-    project_root = ensure_project_exists(args.project)
-    ensure_knowledge_base(project_root)
-    state = read_state(args.project)
+    ensure_knowledge_base()
 
-    review_path = project_root / args.review_path
+    review_path = repo_root() / args.review_path
     if not review_path.is_file():
         raise SystemExit(f"Error: missing review file: {review_path}")
 
     decisions, _ = parse_review_file(review_path)
-    candidates = read_candidates(project_root)
-    entries = read_entries(project_root)
+    candidates = read_candidates()
+    entries = read_entries()
 
     decision_map = {item["candidate_id"]: item for item in decisions}
     for item in decisions:
@@ -852,6 +968,7 @@ def command_review_apply(args: argparse.Namespace) -> int:
                     "title": candidate["title"],
                     "kind": candidate["kind"],
                     "stage": candidate["stage"],
+                    "project_slug": candidate.get("project_slug", ""),
                     "summary": candidate["summary"],
                     "note": note or candidate.get("note", ""),
                     "tags": candidate.get("tags", []),
@@ -859,7 +976,7 @@ def command_review_apply(args: argparse.Namespace) -> int:
                     "path": str(relative_path),
                     "created_at": utc_now(),
                 }
-                (project_root / relative_path).write_text(format_entry_markdown(entry), encoding="utf-8")
+                (repo_root() / relative_path).write_text(format_entry_markdown(entry), encoding="utf-8")
                 entries.append(entry)
                 existing_entry = entry
                 promoted += 1
@@ -875,48 +992,162 @@ def command_review_apply(args: argparse.Namespace) -> int:
         else:
             raise SystemExit(f"Error: unsupported action: {action}")
 
-    write_candidates(project_root, candidates)
-    write_entries(project_root, entries)
-    append_history(
-        state,
-        "review_apply",
-        state["current_stage"],
-        f"Applied review doc: {args.review_path} | promoted={promoted}",
-    )
-    write_state(args.project, state)
+    write_candidates(candidates)
+    write_entries(entries)
+
+    if args.project:
+        state = read_state(args.project)
+        append_history(
+            state,
+            "review_apply",
+            state["current_stage"],
+            f"Applied review doc: {args.review_path} | promoted={promoted}",
+        )
+        write_state(args.project, state)
+
     print(f"Applied review doc: {args.review_path}")
     print(f"Promoted to entries: {promoted}")
     return 0
 
 
 def command_kb_list(args: argparse.Namespace) -> int:
-    project_root = ensure_project_exists(args.project)
-    ensure_knowledge_base(project_root)
+    ensure_knowledge_base()
 
     layer = args.layer
-    print(f"Project: {args.project}")
+    project_filter = args.project or None
+    label = f"project={project_filter}" if project_filter else "all projects"
+    print(f"Global knowledge ({label})")
 
     if layer in {"候选", "全部"}:
-        candidates = sorted(read_candidates(project_root), key=lambda item: int(item["id"]), reverse=True)
+        candidates = sorted(read_candidates(), key=lambda item: int(item["id"]), reverse=True)
+        if project_filter:
+            candidates = [c for c in candidates if c.get("project_slug") == project_filter]
         if args.limit:
             candidates = candidates[: args.limit]
         print(f"候选条目: {len(candidates)}")
         for item in candidates:
+            proj = item.get("project_slug", "—")
             print(
-                f"  - #{item['id']} | {item['status']} | {item['kind']} | {item['stage']} | {item['title']} | {item['path']}"
+                f"  - #{item['id']} | {item['status']} | {item['kind']} | {item['stage']} | [{proj}] {item['title']}"
             )
 
     if layer in {"正式", "全部"}:
-        entries = sorted(read_entries(project_root), key=lambda item: int(item["id"]), reverse=True)
+        entries = sorted(read_entries(), key=lambda item: int(item["id"]), reverse=True)
+        if project_filter:
+            entries = [e for e in entries if e.get("project_slug") == project_filter]
         if args.limit:
             entries = entries[: args.limit]
         print(f"正式条目: {len(entries)}")
         for item in entries:
+            proj = item.get("project_slug", "—")
             print(
-                f"  - #{item['id']} | {item['kind']} | {item['stage']} | {item['title']} | {item['path']}"
+                f"  - #{item['id']} | {item['kind']} | {item['stage']} | [{proj}] {item['title']}"
             )
 
     return 0
+
+
+# ---------------------------------------------------------------------------
+# Pressure test commands
+# ---------------------------------------------------------------------------
+
+def command_run_checks(args: argparse.Namespace) -> int:
+    ensure_project_exists(args.project)
+    state = read_state(args.project)
+    stage = require_valid_stage(args.stage)
+    from check_engine import init_check_session, generate_check_template
+    init_check_session(state, stage)
+    write_state(args.project, state)
+    print(generate_check_template(stage))
+    return 0
+
+
+def command_submit_check(args: argparse.Namespace) -> int:
+    ensure_project_exists(args.project)
+    state = read_state(args.project)
+    stage = require_valid_stage(args.stage)
+    from check_engine import submit_check_result
+    msg = submit_check_result(
+        state, stage, args.check_id, args.result,
+        score=args.score, note=args.note or "",
+    )
+    write_state(args.project, state)
+    print(msg)
+    return 0 if msg.startswith("OK") else 1
+
+
+def command_submit_checks(args: argparse.Namespace) -> int:
+    ensure_project_exists(args.project)
+    state = read_state(args.project)
+    stage = require_valid_stage(args.stage)
+    import sys as _sys
+    raw = _sys.stdin.read()
+    items = json.loads(raw)
+    from check_engine import submit_checks_batch
+    messages = submit_checks_batch(state, stage, items)
+    write_state(args.project, state)
+    for msg in messages:
+        print(msg)
+    return 0
+
+
+def command_check_status(args: argparse.Namespace) -> int:
+    ensure_project_exists(args.project)
+    state = read_state(args.project)
+    stage = require_valid_stage(args.stage)
+    from check_engine import get_check_status, compute_aggregate_score
+    status = get_check_status(state, stage)
+    print(f"Stage: {stage}")
+    print(f"完成度: {status['done']}/{status['total']}")
+    print(f"通过: {status['passed']} | 未通过: {status['failed']} | 跳过: {status['skipped']} | 待填: {status['pending']}")
+    if status["pending_ids"]:
+        print("待填项:")
+        for cid in status["pending_ids"]:
+            print(f"  - {cid}")
+    agg = compute_aggregate_score(state, stage)
+    if agg:
+        print(f"聚合评分: {agg['total_score']}/{agg['max_score']} (判定: {agg['level'] or '—'})")
+    return 0
+
+
+def command_check_report(args: argparse.Namespace) -> int:
+    project_root = ensure_project_exists(args.project)
+    state = read_state(args.project)
+    stage = require_valid_stage(args.stage)
+    from check_engine import generate_check_report
+    report = generate_check_report(state, stage, project_root)
+    print(report)
+    return 0
+
+
+def command_check_chapter(args: argparse.Namespace) -> int:
+    project_root = ensure_project_exists(args.project)
+    state = read_state(args.project)
+    chapter_num = str(args.chapter_num)
+    from check_engine import (
+        init_chapter_check_session, generate_check_template,
+        get_check_status, generate_check_report,
+    )
+    if args.report:
+        report = generate_check_report(state, "expansion", project_root, chapter_num=chapter_num)
+        print(report)
+    else:
+        init_chapter_check_session(state, chapter_num)
+        write_state(args.project, state)
+        print(generate_check_template("expansion"))
+        print(f"\n提交时使用: guard.py submit-check {args.project} expansion <check_id> <result> (章号通过内部状态追踪)")
+    return 0
+
+
+def command_skip_check(args: argparse.Namespace) -> int:
+    ensure_project_exists(args.project)
+    state = read_state(args.project)
+    stage = require_valid_stage(args.stage)
+    from check_engine import skip_check
+    msg = skip_check(state, stage, args.check_id, args.reason)
+    write_state(args.project, state)
+    print(msg)
+    return 0 if msg.startswith("OK") else 1
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -946,6 +1177,12 @@ def build_parser() -> argparse.ArgumentParser:
     set_mode.add_argument("mode", choices=sorted(ALLOWED_MODES))
     set_mode.add_argument("--note")
     set_mode.set_defaults(func=command_set_mode)
+
+    set_killer_test = subparsers.add_parser("set-killer-test", help="Record killer test result")
+    set_killer_test.add_argument("project")
+    set_killer_test.add_argument("result", choices=["pass", "fail"])
+    set_killer_test.add_argument("--note")
+    set_killer_test.set_defaults(func=command_set_killer_test)
 
     set_premise = subparsers.add_parser("set-premise", help="Record premise test result")
     set_premise.add_argument("project")
@@ -980,7 +1217,7 @@ def build_parser() -> argparse.ArgumentParser:
     rewind.add_argument("--note")
     rewind.set_defaults(func=command_rewind)
 
-    capture = subparsers.add_parser("capture", help="Capture a reusable idea or lesson into candidate knowledge")
+    capture = subparsers.add_parser("capture", help="Capture a reusable idea or lesson into global candidate knowledge")
     capture.add_argument("project")
     capture.add_argument("kind", choices=sorted(KNOWLEDGE_KINDS))
     capture.add_argument("title")
@@ -992,17 +1229,60 @@ def build_parser() -> argparse.ArgumentParser:
     capture.set_defaults(func=command_capture)
 
     review_create = subparsers.add_parser("review-create", help="Generate a Chinese review doc for candidates")
-    review_create.add_argument("project")
+    review_create.add_argument("--project", help="Filter candidates by project slug (optional)")
     review_create.add_argument("--id", action="append", help="Candidate ID to include; repeatable")
     review_create.set_defaults(func=command_review_create)
 
     review_apply = subparsers.add_parser("review-apply", help="Apply decisions from a review doc")
-    review_apply.add_argument("project")
-    review_apply.add_argument("review_path", help="Path relative to the project root")
+    review_apply.add_argument("review_path", help="Path relative to the repo root (e.g. knowledge/reviews/001_candidate-review.md)")
+    review_apply.add_argument("--project", help="Project to record history in (optional)")
     review_apply.set_defaults(func=command_review_apply)
 
-    kb_list = subparsers.add_parser("kb-list", help="List candidates and/or formal entries")
-    kb_list.add_argument("project")
+    # -- Pressure test commands --
+    run_checks = subparsers.add_parser("run-checks", help="Initialize check session and output template")
+    run_checks.add_argument("project")
+    run_checks.add_argument("stage", choices=STAGES)
+    run_checks.set_defaults(func=command_run_checks)
+
+    submit_check_cmd = subparsers.add_parser("submit-check", help="Submit a single check result")
+    submit_check_cmd.add_argument("project")
+    submit_check_cmd.add_argument("stage", choices=STAGES)
+    submit_check_cmd.add_argument("check_id")
+    submit_check_cmd.add_argument("result", choices=["pass", "fail", "skip"])
+    submit_check_cmd.add_argument("--score", type=int)
+    submit_check_cmd.add_argument("--note", default="")
+    submit_check_cmd.set_defaults(func=command_submit_check)
+
+    submit_checks_cmd = subparsers.add_parser("submit-checks", help="Batch submit check results from stdin JSON")
+    submit_checks_cmd.add_argument("project")
+    submit_checks_cmd.add_argument("stage", choices=STAGES)
+    submit_checks_cmd.set_defaults(func=command_submit_checks)
+
+    check_status_cmd = subparsers.add_parser("check-status", help="Show check completion status for a stage")
+    check_status_cmd.add_argument("project")
+    check_status_cmd.add_argument("stage", choices=STAGES)
+    check_status_cmd.set_defaults(func=command_check_status)
+
+    check_report_cmd = subparsers.add_parser("check-report", help="Generate check report (stdout + md file)")
+    check_report_cmd.add_argument("project")
+    check_report_cmd.add_argument("stage", choices=STAGES)
+    check_report_cmd.set_defaults(func=command_check_report)
+
+    check_chapter_cmd = subparsers.add_parser("check-chapter", help="Single chapter pressure test (expansion)")
+    check_chapter_cmd.add_argument("project")
+    check_chapter_cmd.add_argument("chapter_num", type=int)
+    check_chapter_cmd.add_argument("--report", action="store_true", help="Generate report instead of template")
+    check_chapter_cmd.set_defaults(func=command_check_chapter)
+
+    skip_check_cmd = subparsers.add_parser("skip-check", help="Skip a check with reason")
+    skip_check_cmd.add_argument("project")
+    skip_check_cmd.add_argument("stage", choices=STAGES)
+    skip_check_cmd.add_argument("check_id")
+    skip_check_cmd.add_argument("--reason", required=True)
+    skip_check_cmd.set_defaults(func=command_skip_check)
+
+    kb_list = subparsers.add_parser("kb-list", help="List global candidates and/or formal entries")
+    kb_list.add_argument("--project", help="Filter by project slug (optional)")
     kb_list.add_argument("--layer", choices=["候选", "正式", "全部"], default="全部")
     kb_list.add_argument("--limit", type=int)
     kb_list.set_defaults(func=command_kb_list)

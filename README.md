@@ -26,13 +26,19 @@ bash scripts/init_project.sh my-story "真假千金反杀"
 python3 scripts/guard.py status my-story
 ```
 
-3. 回退到上一步：
+3. 记录 Killer Test 结果：
+
+```bash
+python3 scripts/guard.py set-killer-test my-story pass
+```
+
+4. 回退到上一步：
 
 ```bash
 python3 scripts/guard.py rewind my-story previous
 ```
 
-4. 捕获知识到项目知识库：
+5. 捕获知识到项目知识库：
 
 ```bash
 python3 scripts/guard.py capture my-story lesson "前提校验太晚" \
@@ -41,7 +47,7 @@ python3 scripts/guard.py capture my-story lesson "前提校验太晚" \
   --tag workflow
 ```
 
-5. 审核候选知识：
+6. 审核候选知识：
 
 ```bash
 python3 scripts/guard.py review-create my-story
@@ -49,7 +55,7 @@ python3 scripts/guard.py review-create my-story
 python3 scripts/guard.py review-apply my-story knowledge/reviews/001_candidate-review.md
 ```
 
-6. 开始和 Claude Code 对话：
+7. 开始和 Claude Code 对话：
 
 ```text
 我准备开始 output/my-story 这个项目。
@@ -78,6 +84,7 @@ python3 scripts/guard.py review-apply my-story knowledge/reviews/001_candidate-r
         ├── PROJECT_INFO.md
         ├── project_state.json
         ├── 00_Brainstorm.md
+        ├── 00_Killer_Test.md
         ├── 00_Creative_Chat_Log.md
         ├── 01_Evaluation_Log.md
         ├── 02_Structure.md
@@ -103,8 +110,9 @@ python3 scripts/guard.py review-apply my-story knowledge/reviews/001_candidate-r
 ## 写作流程
 
 ```text
-原始脑洞 → 输入收集 → 前提因果校验 → 脑洞裂变 → 方向评估
-→ 结构方案 → 详细大纲 → Prototype → 场景化扩写 → 结构与读感复核
+原始脑洞 → 输入收集 → Killer Test → 前提因果校验 → 脑洞裂变 → 方向评估
+→ 结构方案（含情绪曲线）→ 详细大纲 → Scene Pressure Test → Prototype
+→ 场景化扩写 → 结构与读感复核
 ```
 
 每个阶段都有确认门槛，用户不确认就不往下走。
