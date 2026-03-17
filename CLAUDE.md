@@ -4,18 +4,21 @@
 
 它不追求一口气自动写完整本，而是把创作拆成可停顿、可确认、可修正、可回退、可留痕的阶段，让用户保留主导权，Claude Code 负责协助推进、诊断、整理和扩写。
 
-## 进入项目后的默认顺序
+## 进入项目后的默认读取顺序
 
-1. 先读 `README.md`，确认仓库定位与目录约定。
-2. 再读 `AI_WRITING_SOP.md`，理解阶段推进方式。
-3. 再读 `PROJECT_RULES.md`，确认硬规则、停止条件与确认门槛。
-4. 最后读 `CONTENT_FRAMEWORK.md`，对齐内容写法、节奏与阅读体验要求。
+按阶段按需加载，不全量读取：
+
+- **始终读**：`CLAUDE.md`（自动）+ `CONTENT_FRAMEWORK.md`（核心写法目标）
+- **Structure 阶段起加读**：`PROJECT_RULES.md` + `CONTENT_FRAMEWORK_structure.md`
+- **Prototype 阶段起加读**：`AI_WRITING_SOP.md`（如需阶段详情）+ `CONTENT_FRAMEWORK_writing.md`
+
+需要确认仓库定位或目录约定时，查阅 `README.md`。
 
 ## 权威来源
 
 - **流程推进**：`AI_WRITING_SOP.md`
 - **硬规则与停止条件**：`PROJECT_RULES.md`
-- **内容写法与阅读体验**：`CONTENT_FRAMEWORK.md`
+- **内容写法与阅读体验**：`CONTENT_FRAMEWORK.md` + `CONTENT_FRAMEWORK_structure.md` + `CONTENT_FRAMEWORK_writing.md`
 - **仓库定位与命令**：`README.md`
 
 如果文档之间出现口径差异，按上面的职责边界解释，不自行混写或扩大范围。
@@ -32,15 +35,7 @@
 
 ## 确认门槛
 
-以下节点必须等用户明确确认后才能继续：
-
-1. 脑洞裂变后
-2. 方向评估后
-3. 结构方案后（含情绪曲线确认）
-4. 详细大纲后
-5. Scene Pressure Test 后
-6. Prototype 后
-7. 每次扩写后
+详见 `PROJECT_RULES.md` §2。
 
 可接受信号：`继续`、`下一步`、`按这个来`、`可以`，或明确修正后附带继续指令。
 
@@ -48,74 +43,32 @@
 
 状态管理优先通过 `scripts/guard.py`：
 
-```bash
-# 查看项目状态
-python3 scripts/guard.py status <project>
+| 命令 | 用途 |
+|------|------|
+| `guard.py status <project>` | 查看项目状态 |
+| `guard.py advance <project> <stage>` | 推进到指定阶段 |
+| `guard.py confirm <project>` | 确认当前阶段 |
+| `guard.py rewind <project> <target>` | 回退到指定阶段 |
+| `guard.py set-killer-test <project> pass/fail` | 记录 Killer Test 结果 |
+| `guard.py run-checks <project> <stage>` | 初始化压力测试检查 |
 
-# 推进到指定阶段（必须手动指定目标阶段，用户确认后才能推进）
-python3 scripts/guard.py advance <project> <stage>
-
-# 确认当前阶段
-python3 scripts/guard.py confirm <project>
-
-# 回退到指定阶段
-python3 scripts/guard.py rewind <project> <target>
-
-# 捕获知识到全局知识库（候选层）
-python3 scripts/guard.py capture <project> <kind> <title> --summary "..." --source <file> --tag <tag>
-
-# 生成候选知识审核文档（可省略 --project 查看全局）
-python3 scripts/guard.py review-create [--project <project>]
-
-# 记录 Killer Test 结果
-python3 scripts/guard.py set-killer-test <project> pass
-python3 scripts/guard.py set-killer-test <project> fail
-
-# 应用审核结果（路径相对仓库根目录）
-python3 scripts/guard.py review-apply knowledge/reviews/<review-file>
-
-# 查看全局知识库
-python3 scripts/guard.py kb-list [--project <project>] [--layer 候选|正式|全部]
-
-# --- 压力测试检查命令 ---
-
-# 初始化检查会话，输出检查模板（供 Claude 填写）
-python3 scripts/guard.py run-checks <project> <stage>
-
-# 提交单条检查结果
-python3 scripts/guard.py submit-check <project> <stage> <check_id> <result> [--score N] [--note ""]
-
-# 从 stdin 批量提交检查结果（JSON 格式）
-echo '[{"check_id":"...","result":"pass","note":"..."}]' | python3 scripts/guard.py submit-checks <project> <stage>
-
-# 查看检查完成度
-python3 scripts/guard.py check-status <project> <stage>
-
-# 生成检查报告（双写 stdout + md 文件）
-python3 scripts/guard.py check-report <project> <stage>
-
-# 单章压力测试（Expansion 阶段）
-python3 scripts/guard.py check-chapter <project> <chapter_num>
-python3 scripts/guard.py check-chapter <project> <chapter_num> --report
-
-# 用户确认跳过某条检查（必须带原因）
-python3 scripts/guard.py skip-check <project> <stage> <check_id> --reason "..."
-```
+其余压力测试命令（submit-check, submit-checks, check-status, check-report, check-chapter, skip-check）用法见 `guard.py <command> --help`。
 
 当文档描述与 `project_state.json` 冲突时，先修状态或说明冲突，不口头假装已推进。
 
 ## 文件纪律
 
-- 项目产物放在 `output/<project>/`。
+详见 `PROJECT_RULES.md` §5。核心要点：
+
+- 项目产物放 `output/<project>/`，正式正文放 `chapters/`。
 - 阶段总文件 + `stage_logs/` 单轮归档并存。
 - `01_Evaluation_Log.md` 必须追加，不覆盖。
-- `00_Creative_Chat_Log.md` 强制追加，每轮必须有 `- 关键决策: <内容>`，否则 guard.py 阻止推进。
-- 单轮归档默认新增文件，不覆盖旧记录。
-- 回退是非破坏性的；有价值的旧内容进全局 `knowledge/`。
-- **全局知识库**（仓库根 `knowledge/`）跨项目共享，三层：`candidates/` → `reviews/` → `entries/`。
-- **调用规则**：02 Structure 及之前可读取 `knowledge/entries/`；03 Outline 及之后只写入不读取。
-- 正式正文放 `chapters/`。
+- `00_Creative_Chat_Log.md` 强制追加，每轮必须有 `- 关键决策: <内容>`。
 - 受控试写必须明确标注，归档到发起阶段对应目录。
+
+## 停止条件
+
+详见 `PROJECT_RULES.md` §3。
 
 ## 框架调试模式
 
@@ -125,18 +78,6 @@ python3 scripts/guard.py skip-check <project> <stage> <check_id> --reason "..."
 - 首要目标是暴露流程缺陷，不是替不通的前提继续包装。
 - 前提因果链不通就停，明确记录哪一步问得太晚。
 - 优先修框架文档和检查点，再决定是否继续样本。
-
-## 停止条件
-
-出现以下情况必须停止继续推进：
-
-1. 方向未定 / 结构未稳
-2. 前提因果链答不通（"为什么非要这么做""为什么不能更简单"）
-3. 关键转折依赖巧合或空降信息
-4. 人物明显工具化
-5. Prototype 有明显提纲腔
-6. 扩写出现 outline 翻译腔、对话同质化、场景没立住
-7. 用户要求回到上一层修改
 
 ## 发散模式
 
@@ -238,8 +179,7 @@ scene-xx-终稿.md     ← 用户确认"这稿过了"
 2. 修改 `scripts/init_project.sh` → 至少跑一次初始化确认目录结构正确。
 3. 修改 `templates/` 下模板 → 确认模板占位符、标题、格式无误。
 4. 修改 `AI_WRITING_SOP.md` / `PROJECT_RULES.md` / `CONTENT_FRAMEWORK.md` → 确认与 CLAUDE.md 权威来源表述无矛盾。
-5. 修改 `knowledge/` 相关逻辑 → 确认 `guard.py capture` / `kb-list` 正常工作。
-6. 如果验证命令失败，必须先判断是代码问题、环境问题还是测试数据问题，再决定是否继续。
+5. 如果验证命令失败，必须先判断是代码问题、环境问题还是测试数据问题，再决定是否继续。
 
 ## 推荐 commit 粒度与命名
 
@@ -309,13 +249,6 @@ commit message 必须体现"为什么要改"，不要写空泛描述。
 - 每个项目的状态文件 `output/<project>/project_state.json` 完全独立，互不影响。
 - `scripts/guard.py`、`check_defs.py`、`check_engine.py` 是只读代码，无并发冲突。
 
-### 共享区域注意事项
-
-| 区域 | 风险 | 应对 |
-|------|------|------|
-| `knowledge/` 全局知识库 | 多项目同时 `capture` 可能写同一个 `index.json` | 低频操作，错开 capture 时机即可 |
-| `.git` | 多实例同时 commit/push 会冲突 | 每个实例用独立工作分支 |
-
 ### 分支管理
 
 1. **每个项目使用独立工作分支**，命名 `project/<slug>`（如 `project/xiao-hao-lao-gong`）。
@@ -353,7 +286,7 @@ HTTP_PROXY="http://127.0.0.1:7897" HTTPS_PROXY="http://127.0.0.1:7897" git push 
 开始工作前，默认执行以下顺序：
 
 1. 先阅读本文件（CLAUDE.md）。
-2. 按"进入项目后的默认顺序"读取框架文档。
+2. 按"进入项目后的默认读取顺序"按需加载框架文档。
 3. 确认当前分支不是 `main`（如果在 `main`，先切到工作分支）。
 4. 查看当前工作区是否已有未提交改动。
 5. 根据用户任务，先定义本次要完成的 milestone。

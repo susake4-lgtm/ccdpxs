@@ -32,13 +32,7 @@ STAGES = [
 
 STAGE_INDEX = {stage: index + 1 for index, stage in enumerate(STAGES)}
 ALLOWED_MODES = {"writing", "debug"}
-KNOWLEDGE_KINDS = {"idea", "lesson", "risk", "rejection", "rule", "fragment"}
-REVIEW_ACTIONS = {"保留", "丢弃", "稍后"}
 DEFAULT_STATE_VERSION = 5
-
-# Stages at or before which the global knowledge base may be consulted.
-# After KNOWLEDGE_READ_CUTOFF_STAGE, knowledge is write-only (output only, no reading).
-KNOWLEDGE_READ_CUTOFF_STAGE = "structure"
 
 
 REQUIRED_PROJECT_PATHS = [
@@ -97,15 +91,6 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def slugify(value: str) -> str:
-    normalized = re.sub(r"[^A-Za-z0-9\u4e00-\u9fff._-]+", "-", value.strip().lower())
-    normalized = re.sub(r"-{2,}", "-", normalized).strip("-._")
-    return normalized or "entry"
-
-
-def next_numeric_id(items: list[dict[str, Any]]) -> int:
-    return max((int(item.get("id", 0)) for item in items), default=0) + 1
-
 
 def default_state(project_slug: str, project_title: str | None = None) -> dict[str, Any]:
     return {
@@ -140,33 +125,6 @@ def project_dir(project_slug: str) -> Path:
 def state_path(project_slug: str) -> Path:
     return project_dir(project_slug) / "project_state.json"
 
-
-# ---------------------------------------------------------------------------
-# Global knowledge base (repo-level, shared across all projects)
-# ---------------------------------------------------------------------------
-
-def knowledge_root() -> Path:
-    return repo_root() / "knowledge"
-
-
-def candidates_dir() -> Path:
-    return knowledge_root() / "candidates"
-
-
-def candidates_index_path() -> Path:
-    return candidates_dir() / "index.json"
-
-
-def entries_dir() -> Path:
-    return knowledge_root() / "entries"
-
-
-def entries_index_path() -> Path:
-    return entries_dir() / "index.json"
-
-
-def reviews_dir() -> Path:
-    return knowledge_root() / "reviews"
 
 
 def ensure_project_exists(project_slug: str) -> Path:
@@ -355,192 +313,10 @@ def blockers_for_target(
     return blockers
 
 
-def ensure_knowledge_base() -> None:
-    """Ensure the global (repo-level) knowledge base directories and index files exist."""
-    root = knowledge_root()
-    candidate_root = candidates_dir()
-    entry_root = entries_dir()
-    review_root = reviews_dir()
-
-    root.mkdir(parents=True, exist_ok=True)
-    candidate_root.mkdir(parents=True, exist_ok=True)
-    entry_root.mkdir(parents=True, exist_ok=True)
-    review_root.mkdir(parents=True, exist_ok=True)
-
-    candidate_index = candidates_index_path()
-    if not candidate_index.exists():
-        write_json_file(candidate_index, [])
-
-    entry_index = entries_index_path()
-    if not entry_index.exists():
-        write_json_file(entry_index, [])
-
-    readme = root / "README.md"
-    if not readme.exists():
-        readme.write_text(
-            "# 全局知识库\n\n"
-            "跨项目积累的创作规律、失败经验和可复用片段。\n\n"
-            "## 三层结构\n\n"
-            "1. `candidates/`：LLM 汇总输出的候选条目，允许粗糙。\n"
-            "2. `reviews/`：筛选文档，用中文标记保留、丢弃、合并、稍后。\n"
-            "3. `entries/`：正式知识库，只放用户确认过的高价值内容。\n\n"
-            "## 调用规则\n\n"
-            "- **02 Structure 及之前**：可读取 `entries/` 辅助方向判断。\n"
-            "- **03 Outline 及之后**：只写入（capture），不读取，避免污染当前故事的内部一致性。\n\n"
-            "## 来源\n\n"
-            "知识来自各项目的 `00_Creative_Chat_Log.md`，由用户主动触发汇总后进入候选层。\n",
-            encoding="utf-8",
-        )
-
-
-def load_index(index_path: Path, label: str) -> list[dict[str, Any]]:
-    raw = read_json_file(index_path, [])
-    if not isinstance(raw, list):
-        raise SystemExit(f"Error: invalid {label} index type: {index_path}")
-    return raw
-
-
-def read_candidates() -> list[dict[str, Any]]:
-    ensure_knowledge_base()
-    return load_index(candidates_index_path(), "candidate")
-
-
-def write_candidates(payload: list[dict[str, Any]]) -> None:
-    write_json_file(candidates_index_path(), payload)
-
-
-def read_entries() -> list[dict[str, Any]]:
-    ensure_knowledge_base()
-    return load_index(entries_index_path(), "entry")
-
-
-def write_entries(payload: list[dict[str, Any]]) -> None:
-    write_json_file(entries_index_path(), payload)
-
-
-def validate_source_paths(project_root: Path, project_slug: str, sources: list[str]) -> list[str]:
-    """Validate source paths (relative to project root) and return repo-relative forms."""
-    normalized_sources: list[str] = []
-    for raw_source in sources:
-        source_path = Path(raw_source)
-        if source_path.is_absolute():
-            raise SystemExit("Error: source paths must be relative to the project root")
-        resolved = (project_root / source_path).resolve()
-        try:
-            resolved.relative_to(project_root.resolve())
-        except ValueError as exc:
-            raise SystemExit(f"Error: source path escapes project root: {raw_source}") from exc
-        if not resolved.exists():
-            raise SystemExit(f"Error: missing source path: {raw_source}")
-        # Store as repo-relative path for provenance clarity
-        normalized_sources.append(f"output/{project_slug}/{source_path}")
-    return normalized_sources
-
-
-def format_candidate_markdown(candidate: dict[str, Any]) -> str:
-    lines = [
-        f"# {candidate['title']}",
-        "",
-        f"- 候选ID: {candidate['id']}",
-        f"- 类型: {candidate['kind']}",
-        f"- 阶段: {candidate['stage']}",
-        f"- 来源项目: {candidate.get('project_slug', '—')}",
-        f"- 创建时间: {candidate['created_at']}",
-        f"- 当前状态: {candidate['status']}",
-    ]
-    if candidate.get("tags"):
-        lines.append(f"- 标签: {', '.join(candidate['tags'])}")
-    if candidate.get("sources"):
-        lines.append(f"- 来源文件: {', '.join(f'`{item}`' for item in candidate['sources'])}")
-    lines.extend(["", "## 摘要", "", candidate["summary"]])
-    if candidate.get("note"):
-        lines.extend(["", "## 备注", "", candidate["note"]])
-    return "\n".join(lines) + "\n"
-
-
-def format_entry_markdown(entry: dict[str, Any]) -> str:
-    lines = [
-        f"# {entry['title']}",
-        "",
-        f"- 正式知识ID: {entry['id']}",
-        f"- 来源候选ID: {entry['source_candidate_id']}",
-        f"- 类型: {entry['kind']}",
-        f"- 阶段: {entry['stage']}",
-        f"- 来源项目: {entry.get('project_slug', '—')}",
-        f"- 收录时间: {entry['created_at']}",
-    ]
-    if entry.get("tags"):
-        lines.append(f"- 标签: {', '.join(entry['tags'])}")
-    if entry.get("sources"):
-        lines.append(f"- 来源文件: {', '.join(f'`{item}`' for item in entry['sources'])}")
-    lines.extend(["", "## 摘要", "", entry["summary"]])
-    if entry.get("note"):
-        lines.extend(["", "## 备注", "", entry["note"]])
-    return "\n".join(lines) + "\n"
-
-
-def ensure_candidate_by_id(candidates: list[dict[str, Any]], candidate_id: int) -> dict[str, Any]:
-    for candidate in candidates:
-        if int(candidate.get("id", 0)) == candidate_id:
-            return candidate
-    raise SystemExit(f"Error: missing candidate id: {candidate_id}")
-
-
-def parse_review_action(raw_value: str) -> tuple[str, int | None]:
-    cleaned = raw_value.strip()
-    if cleaned in REVIEW_ACTIONS:
-        return cleaned, None
-    match = re.fullmatch(r"合并[:：]\s*(\d+)", cleaned)
-    if match:
-        return "合并", int(match.group(1))
-    raise SystemExit(f"Error: invalid review action: {raw_value}")
-
-
-def parse_review_file(review_path: Path) -> tuple[list[dict[str, Any]], str]:
-    content = review_path.read_text(encoding="utf-8")
-    marker = re.compile(r"^## 候选 (\d+)\s*$", re.MULTILINE)
-    matches = list(marker.finditer(content))
-    if not matches:
-        raise SystemExit(f"Error: review file has no candidate sections: {review_path}")
-
-    parsed: list[dict[str, Any]] = []
-    for index, match in enumerate(matches):
-        candidate_id = int(match.group(1))
-        start = match.end()
-        end = matches[index + 1].start() if index + 1 < len(matches) else len(content)
-        block = content[start:end]
-
-        action_match = re.search(r"^- 处理[：:]\s*(.+)\s*$", block, re.MULTILINE)
-        note_match = re.search(r"^- 备注[：:]\s*(.*)\s*$", block, re.MULTILINE)
-        if not action_match:
-            raise SystemExit(f"Error: missing action for candidate {candidate_id} in {review_path}")
-
-        action, merge_target = parse_review_action(action_match.group(1))
-        parsed.append(
-            {
-                "candidate_id": candidate_id,
-                "action": action,
-                "merge_target": merge_target,
-                "note": note_match.group(1).strip() if note_match else "",
-            }
-        )
-
-    return parsed, content
-
-
-
-def print_knowledge_hint(stage: str) -> None:
-    cutoff_index = STAGE_INDEX[KNOWLEDGE_READ_CUTOFF_STAGE]
-    stage_index = STAGE_INDEX[stage]
-    if stage_index <= cutoff_index:
-        print(f"[Knowledge] 当前阶段可读取全局知识库 knowledge/entries/")
-    else:
-        print(f"[Knowledge] 当前阶段只写入知识库，不读取（避免污染故事内部一致性）")
 
 
 def command_init_state(args: argparse.Namespace) -> int:
     project_root = ensure_project_exists(args.project)
-    ensure_knowledge_base()
     path = state_path(args.project)
     if path.exists() and not args.force:
         raise SystemExit(f"Error: state file already exists: {path}")
@@ -557,11 +333,8 @@ def command_init_state(args: argparse.Namespace) -> int:
 
 def command_status(args: argparse.Namespace) -> int:
     project_root = ensure_project_exists(args.project)
-    ensure_knowledge_base()
     state = read_state(args.project)
     missing = validate_project_files(project_root)
-    candidates = read_candidates()
-    entries = read_entries()
 
     current_stage = state["current_stage"]
     print(f"Project: {args.project}")
@@ -570,8 +343,6 @@ def command_status(args: argparse.Namespace) -> int:
     print(f"Killer test passed: {'yes' if state.get('killer_test_passed') else 'no'}"
           f" (attempts: {state.get('killer_test_attempts', 0)}/2)")
     print(f"Premise test passed: {'yes' if state.get('premise_test_passed') else 'no'}")
-    print(f"Global knowledge candidates: {len(candidates)}")
-    print(f"Global knowledge entries: {len(entries)}")
     print("Confirmations:")
     for stage in STAGES:
         if stage in GATE_CONFIRMATION_STAGES:
@@ -592,8 +363,6 @@ def command_status(args: argparse.Namespace) -> int:
             suffix = f" | {note}" if note else ""
             print(f"  - {event['timestamp']} | {event['action']} | {event['stage']}{suffix}")
 
-
-    print_knowledge_hint(current_stage)
     return 0
 
 
@@ -715,7 +484,6 @@ def clear_future_confirmations(state: dict[str, Any], current_stage: str) -> Non
 
 def command_advance(args: argparse.Namespace) -> int:
     project_root = ensure_project_exists(args.project)
-    ensure_knowledge_base()
     state = read_state(args.project)
     target_stage = require_valid_stage(args.stage)
     current_stage = require_valid_stage(state["current_stage"])
@@ -740,8 +508,6 @@ def command_advance(args: argparse.Namespace) -> int:
     append_history(state, "advance", target_stage, args.note or f"Advanced from {previous_stage} to {target_stage}")
     write_state(args.project, state)
     print(f"Advanced to {target_stage}")
-
-    print_knowledge_hint(target_stage)
     return 0
 
 
@@ -772,279 +538,8 @@ def command_rewind(args: argparse.Namespace) -> int:
     write_state(args.project, state)
     print(f"Rewound to {target_stage} (step {STAGE_INDEX[target_stage]})")
     print("Note: rewind is non-destructive; previous files and logs are preserved.")
-
-    print_knowledge_hint(target_stage)
     return 0
 
-
-def command_capture(args: argparse.Namespace) -> int:
-    project_root = ensure_project_exists(args.project)
-    ensure_knowledge_base()
-    state = read_state(args.project)
-    stage = require_valid_stage(args.stage or state["current_stage"])
-    kind = args.kind.lower()
-    if kind not in KNOWLEDGE_KINDS:
-        raise SystemExit(f"Error: unknown knowledge kind: {kind}")
-
-    sources = validate_source_paths(project_root, args.project, args.source or [])
-    candidates = read_candidates()
-    candidate_id = next_numeric_id(candidates)
-    filename = f"{candidate_id:03d}_{kind}_{slugify(args.title)}.md"
-    relative_path = Path("knowledge") / "candidates" / filename
-    absolute_path = repo_root() / relative_path
-
-    tags = [tag.strip() for tag in (args.tag or []) if tag.strip()]
-    summary = args.summary.strip()
-    note = args.note.strip() if args.note else ""
-    created_at = utc_now()
-
-    candidate = {
-        "id": candidate_id,
-        "title": args.title,
-        "kind": kind,
-        "stage": stage,
-        "project_slug": args.project,
-        "summary": summary,
-        "note": note,
-        "tags": tags,
-        "sources": sources,
-        "path": str(relative_path),
-        "created_at": created_at,
-        "status": "待审",
-        "review_history": [],
-    }
-    absolute_path.write_text(format_candidate_markdown(candidate), encoding="utf-8")
-    candidates.append(candidate)
-    write_candidates(candidates)
-
-    append_history(
-        state,
-        "capture",
-        stage,
-        args.note or f"Captured candidate #{candidate_id}: {args.title}",
-    )
-    write_state(args.project, state)
-    print(f"Captured candidate #{candidate_id}: {relative_path}")
-    return 0
-
-
-def command_review_create(args: argparse.Namespace) -> int:
-    ensure_knowledge_base()
-    candidates = read_candidates()
-
-    # Filter by project if specified
-    pool = candidates
-    if args.project:
-        pool = [c for c in candidates if c.get("project_slug") == args.project]
-
-    selected: list[dict[str, Any]] = []
-    if args.id:
-        requested_ids = {int(value) for value in args.id}
-        for candidate_id in requested_ids:
-            selected.append(ensure_candidate_by_id(pool, candidate_id))
-    else:
-        for candidate in pool:
-            if candidate.get("status") in {"待审", "稍后"}:
-                selected.append(candidate)
-
-    selected = sorted(selected, key=lambda item: int(item["id"]))
-    if not selected:
-        raise SystemExit("Error: no candidate entries available for review")
-
-    existing_reviews = sorted(reviews_dir().glob("*.md"))
-    review_id = 1
-    if existing_reviews:
-        numeric_ids = []
-        for path in existing_reviews:
-            match = re.match(r"(\d+)_", path.name)
-            if match:
-                numeric_ids.append(int(match.group(1)))
-        if numeric_ids:
-            review_id = max(numeric_ids) + 1
-
-    filename = f"{review_id:03d}_candidate-review.md"
-    relative_path = Path("knowledge") / "reviews" / filename
-    absolute_path = repo_root() / relative_path
-
-    lines = [
-        f"# 知识候选筛选 {review_id:03d}",
-        "",
-        "## 说明",
-        "",
-        "请把每条候选的 `处理` 改成以下中文动作之一：",
-        "",
-        "- `保留`",
-        "- `丢弃`",
-        "- `合并:<候选ID>`",
-        "- `稍后`",
-        "",
-        "只改 `处理` 和 `备注` 这两行即可。",
-        "",
-    ]
-
-    for candidate in selected:
-        lines.extend(
-            [
-                f"## 候选 {candidate['id']}",
-                "",
-                f"- 标题: {candidate['title']}",
-                f"- 类型: {candidate['kind']}",
-                f"- 阶段: {candidate['stage']}",
-                f"- 来源项目: {candidate.get('project_slug', '—')}",
-                f"- 当前状态: {candidate['status']}",
-            ]
-        )
-        if candidate.get("tags"):
-            lines.append(f"- 标签: {', '.join(candidate['tags'])}")
-        if candidate.get("sources"):
-            lines.append(f"- 来源文件: {', '.join(candidate['sources'])}")
-        lines.extend(
-            [
-                f"- 摘要: {candidate['summary']}",
-                "",
-                "### 审核",
-                "- 处理: 稍后",
-                "- 备注: ",
-                "",
-            ]
-        )
-
-    absolute_path.write_text("\n".join(lines), encoding="utf-8")
-
-    if args.project:
-        state = read_state(args.project)
-        append_history(state, "review_create", state["current_stage"], f"Created review doc: {relative_path}")
-        write_state(args.project, state)
-
-    print(f"Created review doc: {relative_path}")
-    return 0
-
-
-def command_review_apply(args: argparse.Namespace) -> int:
-    ensure_knowledge_base()
-
-    review_path = repo_root() / args.review_path
-    if not review_path.is_file():
-        raise SystemExit(f"Error: missing review file: {review_path}")
-
-    decisions, _ = parse_review_file(review_path)
-    candidates = read_candidates()
-    entries = read_entries()
-
-    decision_map = {item["candidate_id"]: item for item in decisions}
-    for item in decisions:
-        if item["action"] == "合并":
-            target_id = item["merge_target"]
-            if target_id == item["candidate_id"]:
-                raise SystemExit(f"Error: candidate {item['candidate_id']} cannot merge into itself")
-            if target_id not in decision_map and not any(int(candidate["id"]) == target_id for candidate in candidates):
-                raise SystemExit(f"Error: merge target candidate does not exist: {target_id}")
-
-    promoted = 0
-    for item in decisions:
-        candidate = ensure_candidate_by_id(candidates, item["candidate_id"])
-        action = item["action"]
-        note = item["note"]
-        history_entry = {
-            "reviewed_at": utc_now(),
-            "review_file": str(Path(args.review_path)),
-            "action": action if action != "合并" else f"合并:{item['merge_target']}",
-            "note": note,
-        }
-        candidate.setdefault("review_history", []).append(history_entry)
-
-        if action == "保留":
-            existing_entry = next(
-                (entry for entry in entries if int(entry.get("source_candidate_id", 0)) == int(candidate["id"])),
-                None,
-            )
-            if existing_entry is None:
-                entry_id = next_numeric_id(entries)
-                filename = f"{entry_id:03d}_{candidate['kind']}_{slugify(candidate['title'])}.md"
-                relative_path = Path("knowledge") / "entries" / filename
-                entry = {
-                    "id": entry_id,
-                    "source_candidate_id": candidate["id"],
-                    "title": candidate["title"],
-                    "kind": candidate["kind"],
-                    "stage": candidate["stage"],
-                    "project_slug": candidate.get("project_slug", ""),
-                    "summary": candidate["summary"],
-                    "note": note or candidate.get("note", ""),
-                    "tags": candidate.get("tags", []),
-                    "sources": candidate.get("sources", []),
-                    "path": str(relative_path),
-                    "created_at": utc_now(),
-                }
-                (repo_root() / relative_path).write_text(format_entry_markdown(entry), encoding="utf-8")
-                entries.append(entry)
-                existing_entry = entry
-                promoted += 1
-            candidate["status"] = "已收录"
-            candidate["entry_id"] = existing_entry["id"]
-        elif action == "丢弃":
-            candidate["status"] = "已丢弃"
-        elif action == "稍后":
-            candidate["status"] = "稍后"
-        elif action == "合并":
-            candidate["status"] = "已合并"
-            candidate["merged_into"] = item["merge_target"]
-        else:
-            raise SystemExit(f"Error: unsupported action: {action}")
-
-    write_candidates(candidates)
-    write_entries(entries)
-
-    if args.project:
-        state = read_state(args.project)
-        append_history(
-            state,
-            "review_apply",
-            state["current_stage"],
-            f"Applied review doc: {args.review_path} | promoted={promoted}",
-        )
-        write_state(args.project, state)
-
-    print(f"Applied review doc: {args.review_path}")
-    print(f"Promoted to entries: {promoted}")
-    return 0
-
-
-def command_kb_list(args: argparse.Namespace) -> int:
-    ensure_knowledge_base()
-
-    layer = args.layer
-    project_filter = args.project or None
-    label = f"project={project_filter}" if project_filter else "all projects"
-    print(f"Global knowledge ({label})")
-
-    if layer in {"候选", "全部"}:
-        candidates = sorted(read_candidates(), key=lambda item: int(item["id"]), reverse=True)
-        if project_filter:
-            candidates = [c for c in candidates if c.get("project_slug") == project_filter]
-        if args.limit:
-            candidates = candidates[: args.limit]
-        print(f"候选条目: {len(candidates)}")
-        for item in candidates:
-            proj = item.get("project_slug", "—")
-            print(
-                f"  - #{item['id']} | {item['status']} | {item['kind']} | {item['stage']} | [{proj}] {item['title']}"
-            )
-
-    if layer in {"正式", "全部"}:
-        entries = sorted(read_entries(), key=lambda item: int(item["id"]), reverse=True)
-        if project_filter:
-            entries = [e for e in entries if e.get("project_slug") == project_filter]
-        if args.limit:
-            entries = entries[: args.limit]
-        print(f"正式条目: {len(entries)}")
-        for item in entries:
-            proj = item.get("project_slug", "—")
-            print(
-                f"  - #{item['id']} | {item['kind']} | {item['stage']} | [{proj}] {item['title']}"
-            )
-
-    return 0
 
 
 # ---------------------------------------------------------------------------
@@ -1152,7 +647,7 @@ def command_skip_check(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Guard project state transitions and preserve reusable knowledge."
+        description="Guard project state transitions and enforce stage gates."
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -1217,27 +712,6 @@ def build_parser() -> argparse.ArgumentParser:
     rewind.add_argument("--note")
     rewind.set_defaults(func=command_rewind)
 
-    capture = subparsers.add_parser("capture", help="Capture a reusable idea or lesson into global candidate knowledge")
-    capture.add_argument("project")
-    capture.add_argument("kind", choices=sorted(KNOWLEDGE_KINDS))
-    capture.add_argument("title")
-    capture.add_argument("--summary", required=True)
-    capture.add_argument("--stage", choices=STAGES)
-    capture.add_argument("--source", action="append")
-    capture.add_argument("--tag", action="append")
-    capture.add_argument("--note")
-    capture.set_defaults(func=command_capture)
-
-    review_create = subparsers.add_parser("review-create", help="Generate a Chinese review doc for candidates")
-    review_create.add_argument("--project", help="Filter candidates by project slug (optional)")
-    review_create.add_argument("--id", action="append", help="Candidate ID to include; repeatable")
-    review_create.set_defaults(func=command_review_create)
-
-    review_apply = subparsers.add_parser("review-apply", help="Apply decisions from a review doc")
-    review_apply.add_argument("review_path", help="Path relative to the repo root (e.g. knowledge/reviews/001_candidate-review.md)")
-    review_apply.add_argument("--project", help="Project to record history in (optional)")
-    review_apply.set_defaults(func=command_review_apply)
-
     # -- Pressure test commands --
     run_checks = subparsers.add_parser("run-checks", help="Initialize check session and output template")
     run_checks.add_argument("project")
@@ -1280,12 +754,6 @@ def build_parser() -> argparse.ArgumentParser:
     skip_check_cmd.add_argument("check_id")
     skip_check_cmd.add_argument("--reason", required=True)
     skip_check_cmd.set_defaults(func=command_skip_check)
-
-    kb_list = subparsers.add_parser("kb-list", help="List global candidates and/or formal entries")
-    kb_list.add_argument("--project", help="Filter by project slug (optional)")
-    kb_list.add_argument("--layer", choices=["候选", "正式", "全部"], default="全部")
-    kb_list.add_argument("--limit", type=int)
-    kb_list.set_defaults(func=command_kb_list)
 
     return parser
 

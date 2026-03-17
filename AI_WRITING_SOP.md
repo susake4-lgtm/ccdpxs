@@ -3,7 +3,7 @@
 本文件只定义工作流本身：从原始脑洞到正式扩写，阶段如何推进、每阶段产出什么、什么时候进入下一阶段。
 
 硬规则见 `PROJECT_RULES.md`。
-内容写法见 `CONTENT_FRAMEWORK.md`。
+内容写法见 `CONTENT_FRAMEWORK.md`（核心）+ `CONTENT_FRAMEWORK_structure.md`（结构阶段起）+ `CONTENT_FRAMEWORK_writing.md`（Prototype 阶段起）。
 
 ## 总体流程
 
@@ -26,7 +26,7 @@
 
 ## 统一产物模型
 
-每个项目默认放在 `output/<project>/`，采用“双层产物模型”：
+每个项目默认放在 `output/<project>/`，采用"双层产物模型"：
 
 1. 阶段总文件：保存当前阶段最新版本，便于直接阅读
 2. 阶段单轮归档：保存每次推进的独立 md，便于回溯
@@ -35,30 +35,25 @@
 推荐目录：
 
 ```text
-<repo-root>/
-├─ knowledge/                ← 全局知识库（跨项目共享）
-│  ├─ candidates/
-│  ├─ reviews/
-│  └─ entries/
-└─ output/<project>/
-   ├─ PROJECT_INFO.md
-   ├─ project_state.json
-   ├─ 00_Brainstorm.md
-   ├─ 00_Creative_Chat_Log.md    ← 强制追加，版权留痕
-   ├─ 01_Evaluation_Log.md
-   ├─ 02_Structure.md
-   ├─ 03_Outline.md
-   ├─ 04_Prototype.md
-   ├─ chapters/
-   ├─ 00_Killer_Test.md
-   └─ stage_logs/
-      ├─ 00_intake/
-      ├─ 00_killer-test/
-      ├─ 01_idea-fission/
-      ├─ 02_evaluation/
-      ├─ 03_structure/
-      ├─ 04_outline/
-      ├─ 04_scene-pressure-test/
+output/<project>/
+├─ PROJECT_INFO.md
+├─ project_state.json
+├─ 00_Brainstorm.md
+├─ 00_Creative_Chat_Log.md    ← 强制追加，版权留痕
+├─ 01_Evaluation_Log.md
+├─ 02_Structure.md
+├─ 03_Outline.md
+├─ 04_Prototype.md
+├─ chapters/
+├─ 00_Killer_Test.md
+└─ stage_logs/
+   ├─ 00_intake/
+   ├─ 00_killer-test/
+   ├─ 01_idea-fission/
+   ├─ 02_evaluation/
+   ├─ 03_structure/
+   ├─ 04_outline/
+   ├─ 04_scene-pressure-test/
    ├─ 05_prototype/
    ├─ 06_expansion/
    └─ 07_review/
@@ -79,57 +74,26 @@
 - `stage_logs/00_intake/` 单轮归档
 
 退出条件：
-- 已经能用一句话说明”这次要写什么”
+- 已经能用一句话说明"这次要写什么"
 - 知道这次更看重更炸、更稳，还是两者平衡
 - 压力测试检查通过（`guard.py run-checks <project> intake` → 全部填写完成）
 
 ## 阶段 0.3：Killer Test（脑洞粗筛）
 
-目标：
-用 4 个问题快速判断脑洞是否值得继续投入，杀掉"看起来酷但写不出来"的伪好脑洞。
+用 4 个问题快速判断脑洞是否值得继续投入。详细检查项见 `check_defs.py`。
 
-说明：
-这一步在前提因果校验之前。很多脑洞根本不是故事，只是一个设定、反转或氛围，不值得跑完整的五问校验。
+四个核心问题：故事还是点子？冲突天然还是硬造？展开是否能打？是否靠高级感伪装？
 
-四个问题（满分 8 分）：
+决策：0-3 分暂缓，4-5 分可保留需重写核心，6-8 分进入前提因果校验。每个脑洞最多重写 2 次。
 
-1. **故事还是点子？** 是否隐含一个会发生变化的过程，还是只是设定 / 反转 / 画面？（0/1/2）
-2. **冲突天然还是硬造？** 不靠作者额外发明障碍，脑洞本身会自然产生冲突吗？（0/1/2）
-3. **一句话好听还是展开也能打？** 魅力是概述那一下，还是写成场景仍有吸引力？（0/1/2）
-4. **是否靠高级感伪装？** 是靠宿命感 / 悲伤感 / 哲学感显得厉害，还是真有叙事能量？（0/1/2）
+产出：`00_Killer_Test.md` + `stage_logs/00_killer-test/` 单轮归档
 
-决策规则：
-
-- 0-3 分：暂缓，不进入前提校验
-- 4-5 分：可保留，但需重写脑洞核心再测
-- 6-8 分：进入前提因果校验
-
-限制：
-
-- 每个脑洞最多重写 2 次，第 2 次仍不过则标记 freeze
-- 重写建议最多 3 条，不发散
-
-产出：
-- `00_Killer_Test.md`
-- `stage_logs/00_killer-test/` 单轮归档
-
-退出条件：
-- Killer Test 通过（6-8 分），或脑洞被 freeze
-- 压力测试检查通过（`guard.py run-checks <project> killer_test` → 全部填写完成，聚合评分 ≥ 6）
-
-状态管理：
-```bash
-python3 scripts/guard.py set-killer-test <project> pass
-python3 scripts/guard.py set-killer-test <project> fail
-```
+退出条件：Killer Test 通过（6-8 分），或脑洞被 freeze。压力测试检查通过（聚合评分 ≥ 6）。
 
 ## 阶段 0.5：前提因果校验（Premise Pressure Test）
 
 目标：
 在开始裂变、包装和优化之前，先确认前提因果链最低限度是顺的。
-
-说明：
-这一步不是追求“已经非常精彩”，而是避免对一个根上不通的前提继续做脑洞美化。
 
 默认五问：
 
@@ -147,7 +111,7 @@ python3 scripts/guard.py set-killer-test <project> fail
 
 退出条件：
 - 以上五问至少有一套基本自洽的答案
-- 或者明确判定”当前脑洞先不值得继续包装”，转入框架调试或脑洞重建
+- 或者明确判定"当前脑洞先不值得继续包装"，转入框架调试或脑洞重建
 - 压力测试检查通过（`guard.py run-checks <project> premise_test` → 全部填写完成）
 
 ## 阶段 1：脑洞裂变（Idea Fission）
@@ -197,7 +161,7 @@ python3 scripts/guard.py set-killer-test <project> fail
 ## 阶段 3：结构方案（Structure）
 
 目标：
-先搭“故事骨架”，不急着写长文。
+先搭"故事骨架"，不急着写长文。
 
 动作：
 - 明确标题方向、核心冲突、开篇爆点、30% 卡点、中段升级、终局回收
@@ -232,38 +196,20 @@ python3 scripts/guard.py set-killer-test <project> fail
 
 退出条件：
 - 用户认可推进顺序和信息揭露节奏
-- 已能清楚回答”每一章写什么，为什么写”
+- 已能清楚回答"每一章写什么，为什么写"
 - 压力测试检查通过（`guard.py run-checks <project> outline` → 全部填写完成）
 
 ## 阶段 4.5：Scene Pressure Test（场景压力测试）
 
-目标：
-在扩写之前，对大纲中的关键场景做压力测试，防止"大纲很好但场景没力量"。
+对大纲中关键场景做压力测试。优先测试开头、30% 卡点、高潮、结尾 4 个节点。详细维度和评分规则见 `check_defs.py`。
 
-说明：
-不需要每个场景都过。优先测试 4 个关键节点：开头场景、30% 卡点场景、高潮场景、结尾场景。
+五个维度：冲突强度、代价感、信息变化、主角决策、结尾钩子。满分 10 分。
 
-五个维度（满分 10 分）：
+决策：0-3 分回修，4-6 分标风险后可尝试，7-10 分可直接扩写。
 
-1. **冲突强度**：谁想要什么？谁在阻止？（0/1/2）
-2. **代价感**：主角在这个场景失败会失去什么？（0/1/2）
-3. **信息变化**：场景结束后局势 / 认知 / 关系发生了什么变化？（0/1/2）
-4. **主角决策**：主角做了什么选择？还是只是被动承受？（0/1/2）
-5. **结尾钩子**：场景结束时读者为什么要继续读？（0/1/2）
+产出：`stage_logs/04_scene-pressure-test/` 单轮归档
 
-决策规则：
-
-- 0-3 分：场景不成立，回修 Outline 或重新设计该场景
-- 4-6 分：场景偏弱，标注风险点后可尝试扩写，扩写后需重点检查
-- 7-10 分：可直接扩写
-
-产出：
-- `stage_logs/04_scene-pressure-test/` 单轮归档
-
-退出条件：
-- 关键场景（开头、30% 卡点、高潮、结尾）全部 >= 4 分
-- 用户确认后进入 Prototype
-- 压力测试检查通过（`guard.py run-checks <project> scene_pressure_test` → 全部填写完成，聚合评分 ≥ 7）
+退出条件：关键场景全部 >= 4 分，用户确认后进入 Prototype。压力测试检查通过（聚合评分 ≥ 7）。
 
 ## 阶段 5：Prototype
 
@@ -321,7 +267,7 @@ python3 scripts/guard.py set-killer-test <project> fail
 
 如果用户只想验证语气、场景或角色反应，可以做受控试写，但必须满足：
 
-1. 明确标注“受控试写”
+1. 明确标注"受控试写"
 2. 不等于正式进入扩写阶段
 3. 归档到发起该试写的阶段目录
 4. 不能跳过 Prototype
@@ -329,19 +275,3 @@ python3 scripts/guard.py set-killer-test <project> fail
 ## 回退原则
 
 回退默认只改变当前工作点，不删除旧文件和旧思路。
-
-如果某一轮被放弃、回修或降级，但其中包含有价值的判断、片段或失败经验，应整理进全局 `knowledge/`，而不是随着回退一起丢掉。
-
-## 知识筛选原则
-
-知识库为**全局**（仓库根目录 `knowledge/`），跨所有项目共享积累。三层流转：
-
-1. 原始对话留痕在各项目的 `00_Creative_Chat_Log.md`（强制追加，版权留痕）
-2. 用户主动触发汇总 → LLM 提炼 → 候选进入 `knowledge/candidates/`
-3. 审核文档进入 `knowledge/reviews/`，用户标记后
-4. 只有被标记为 `保留` 的候选，才进入 `knowledge/entries/`
-
-## 知识库调用规则
-
-- **02 Structure 及之前**：可读取 `knowledge/entries/` 辅助方向判断
-- **03 Outline 及之后**：只写入（capture），不读取，避免外部内容污染当前故事的内部一致性

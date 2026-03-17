@@ -38,24 +38,7 @@ python3 scripts/guard.py set-killer-test my-story pass
 python3 scripts/guard.py rewind my-story previous
 ```
 
-5. 捕获知识到项目知识库：
-
-```bash
-python3 scripts/guard.py capture my-story lesson "前提校验太晚" \
-  --summary "前提因果校验应该前移到裂变之前。" \
-  --source stage_logs/00_intake/02_premise-pressure-test-failed.md \
-  --tag workflow
-```
-
-6. 审核候选知识：
-
-```bash
-python3 scripts/guard.py review-create my-story
-# 编辑 knowledge/reviews/*.md，标记 保留/丢弃/合并/稍后
-python3 scripts/guard.py review-apply my-story knowledge/reviews/001_candidate-review.md
-```
-
-7. 开始和 Claude Code 对话：
+5. 开始和 Claude Code 对话：
 
 ```text
 我准备开始 output/my-story 这个项目。
@@ -73,9 +56,13 @@ python3 scripts/guard.py review-apply my-story knowledge/reviews/001_candidate-r
 ├── README.md
 ├── AI_WRITING_SOP.md        # 流程：阶段如何推进
 ├── PROJECT_RULES.md         # 规则：什么能做、什么必须停
-├── CONTENT_FRAMEWORK.md     # 写法：内容怎么写、节奏怎么控
+├── CONTENT_FRAMEWORK.md     # 写法：核心写法目标（始终加载）
+├── CONTENT_FRAMEWORK_structure.md  # 写法：人物与冲突（Structure 起加载）
+├── CONTENT_FRAMEWORK_writing.md    # 写法：开篇、节奏、扩写（Prototype 起加载）
 ├── scripts/
 │   ├── guard.py             # 状态管理
+│   ├── check_defs.py        # 压力测试检查定义
+│   ├── check_engine.py      # 压力测试执行引擎
 │   └── init_project.sh      # 项目初始化
 ├── templates/
 │   └── project/             # 新项目模板
@@ -91,10 +78,6 @@ python3 scripts/guard.py review-apply my-story knowledge/reviews/001_candidate-r
         ├── 03_Outline.md
         ├── 04_Prototype.md
         ├── chapters/
-        ├── knowledge/
-        │   ├── candidates/
-        │   ├── reviews/
-        │   └── entries/
         └── stage_logs/
 ```
 
@@ -104,7 +87,9 @@ python3 scripts/guard.py review-apply my-story knowledge/reviews/001_candidate-r
 |------|------|
 | `AI_WRITING_SOP.md` | 从脑洞到成文，阶段如何推进 |
 | `PROJECT_RULES.md` | 确认门槛、停止条件、留痕规则、文件纪律 |
-| `CONTENT_FRAMEWORK.md` | 内容写法、节奏控制、阅读体验要求 |
+| `CONTENT_FRAMEWORK.md` | 核心写法目标（始终加载） |
+| `CONTENT_FRAMEWORK_structure.md` | 人物与冲突推进（Structure 起加载） |
+| `CONTENT_FRAMEWORK_writing.md` | 开篇硬指标、节奏密度、扩写标准（Prototype 起加载） |
 | `CLAUDE.md` | Claude Code 进入仓库后的默认工作方式 |
 
 ## 写作流程
@@ -116,16 +101,6 @@ python3 scripts/guard.py review-apply my-story knowledge/reviews/001_candidate-r
 ```
 
 每个阶段都有确认门槛，用户不确认就不往下走。
-
-## 知识库
-
-每个项目自带三层知识库：
-
-1. `knowledge/candidates/` — 候选条目，允许粗糙
-2. `knowledge/reviews/` — 审核文档，中文标记去留
-3. `knowledge/entries/` — 正式知识，只保留确认过的高价值内容
-
-回退时有价值的旧思路、失败样本、可复用片段都可以沉淀到这里。
 
 ## 两种模式
 
