@@ -541,6 +541,182 @@ def command_rewind(args: argparse.Namespace) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------
+# Stage info & context queries (read-only, for Claude to query on demand)
+# ---------------------------------------------------------------------------
+
+STAGE_EXIT_CRITERIA: dict[str, list[str]] = {
+    "intake": [
+        "能用一句话说明'这次要写什么'",
+        "知道更看重更炸、更稳，还是两者平衡",
+        "压力测试检查通过",
+    ],
+    "killer_test": [
+        "Killer Test 通过（6-8 分），或脑洞被 freeze",
+        "压力测试检查通过（聚合评分 ≥ 6）",
+    ],
+    "premise_test": [
+        "五问至少有一套基本自洽的答案",
+        "或明确判定脑洞先不值得继续包装",
+        "压力测试检查通过",
+    ],
+    "idea_fission": [
+        "用户选定一个方向，或明确修正后继续",
+        "前提已通过因果校验",
+    ],
+    "evaluation": [
+        "已能说清主角想要什么、阻力从哪来、最容易失真的点",
+        "压力测试检查通过",
+    ],
+    "structure": [
+        "用户认可整体结构思路",
+        "关键钩子和中段推进逻辑已稳定",
+        "情绪曲线 5 个节点已确认",
+        "压力测试检查通过",
+    ],
+    "outline": [
+        "用户认可推进顺序和信息揭露节奏",
+        "已能回答'每一章写什么，为什么写'",
+        "压力测试检查通过",
+    ],
+    "scene_pressure_test": [
+        "关键场景（开头、30%卡点、高潮、结尾）全部 >= 4 分",
+        "用户确认后进入 Prototype",
+        "压力测试检查通过（聚合评分 ≥ 7）",
+    ],
+    "prototype": [
+        "Prototype 已证明故事可放大",
+        "没有明显提纲腔、便利转折和角色工具化",
+        "压力测试检查通过",
+    ],
+    "expansion": [
+        "当前单元读感成立",
+        "用户确认继续下一单元",
+        "每章压力测试通过",
+    ],
+    "review": [
+        "结构、人物、语言和节奏未失真",
+        "明确是继续、补档、回修还是回退",
+    ],
+}
+
+STOP_CONDITIONS: list[str] = [
+    "方向未定",
+    "结构未稳",
+    "关键信息缺失",
+    "用户要求修改当前阶段",
+    "日志或文件状态异常",
+    "Killer Test 未通过（0-3 分），或已达 2 次重写上限",
+    "前提因果链不成立（答不通'为什么非要这么做'和'为什么不能更简单'）",
+    "关键动机不清",
+    "关键转折不成立",
+    "人物明显工具化",
+    "Prototype 已露出明显提纲腔",
+    "Scene Pressure Test 关键场景低于 4 分",
+    "扩写方式开始失真",
+    "正文过平或过假",
+    "用户反馈'太平''没劲''不够狠''不像盐选'",
+]
+
+CONFIRMATION_SIGNALS: list[str] = [
+    "继续", "下一步", "按这个来", "可以",
+    "明确修正后附带继续指令",
+]
+
+STAGE_DOCS: dict[str, list[str]] = {
+    "intake": ["CLAUDE.md", "CONTENT_FRAMEWORK.md"],
+    "killer_test": ["CLAUDE.md", "CONTENT_FRAMEWORK.md"],
+    "premise_test": ["CLAUDE.md", "CONTENT_FRAMEWORK.md"],
+    "idea_fission": ["CLAUDE.md", "CONTENT_FRAMEWORK.md"],
+    "evaluation": ["CLAUDE.md", "CONTENT_FRAMEWORK.md"],
+    "structure": ["CLAUDE.md", "CONTENT_FRAMEWORK.md", "PROJECT_RULES.md", "CONTENT_FRAMEWORK_structure.md"],
+    "outline": ["CLAUDE.md", "CONTENT_FRAMEWORK.md", "PROJECT_RULES.md", "CONTENT_FRAMEWORK_structure.md"],
+    "scene_pressure_test": ["CLAUDE.md", "CONTENT_FRAMEWORK.md", "PROJECT_RULES.md", "CONTENT_FRAMEWORK_structure.md"],
+    "prototype": ["CLAUDE.md", "CONTENT_FRAMEWORK.md", "PROJECT_RULES.md", "CONTENT_FRAMEWORK_structure.md", "AI_WRITING_SOP.md", "CONTENT_FRAMEWORK_writing.md"],
+    "expansion": ["CLAUDE.md", "CONTENT_FRAMEWORK.md", "PROJECT_RULES.md", "CONTENT_FRAMEWORK_structure.md", "AI_WRITING_SOP.md", "CONTENT_FRAMEWORK_writing.md"],
+    "review": ["CLAUDE.md", "CONTENT_FRAMEWORK.md", "PROJECT_RULES.md", "CONTENT_FRAMEWORK_structure.md", "AI_WRITING_SOP.md", "CONTENT_FRAMEWORK_writing.md"],
+}
+
+
+def command_stage_info(args: argparse.Namespace) -> int:
+    stage = require_valid_stage(args.stage)
+    idx = STAGE_INDEX[stage]
+    needs_confirmation = stage in GATE_CONFIRMATION_STAGES
+    log_dir = STAGE_LOG_DIRS.get(stage, "—")
+    output_files = TOTAL_STAGE_FILES.get(stage, [])
+    exit_criteria = STAGE_EXIT_CRITERIA.get(stage, [])
+    next_stage = STAGES[idx] if idx < len(STAGES) else "—"
+
+    print(f"Stage: {stage} (step {idx})")
+    print(f"Needs confirmation: {'yes' if needs_confirmation else 'no'}")
+    print(f"Log directory: {log_dir}")
+    print(f"Output files: {', '.join(output_files) if output_files else '—'}")
+    print(f"Next stage: {next_stage}")
+    print("Exit criteria:")
+    for criterion in exit_criteria:
+        print(f"  - {criterion}")
+
+    # Show available checks for this stage
+    try:
+        from check_defs import get_checks_for_stage
+        checks = get_checks_for_stage(stage)
+        if checks:
+            print(f"Available checks: {len(checks)}")
+            for check in checks:
+                print(f"  - {check['id']}: {check['description']}")
+        else:
+            print("Available checks: none")
+    except ImportError:
+        print("Available checks: (check_defs not available)")
+
+    return 0
+
+
+def command_rules(args: argparse.Namespace) -> int:
+    print("=== 停止条件（15 条）===")
+    for i, condition in enumerate(STOP_CONDITIONS, 1):
+        print(f"  {i}. {condition}")
+
+    print()
+    print("=== 确认门槛 ===")
+    print("以下节点必须等用户明确确认：")
+    for stage in STAGES:
+        if stage in GATE_CONFIRMATION_STAGES:
+            print(f"  - {stage}")
+
+    print()
+    print("可接受信号：")
+    for signal in CONFIRMATION_SIGNALS:
+        print(f"  - {signal}")
+
+    return 0
+
+
+def command_context(args: argparse.Namespace) -> int:
+    stage = require_valid_stage(args.stage)
+    docs = STAGE_DOCS.get(stage, [])
+
+    all_docs = [
+        "CLAUDE.md", "AI_WRITING_SOP.md", "PROJECT_RULES.md",
+        "CONTENT_FRAMEWORK.md", "CONTENT_FRAMEWORK_structure.md",
+        "CONTENT_FRAMEWORK_writing.md", "README.md",
+    ]
+
+    print(f"Stage: {stage}")
+    print()
+    print("需要读取的文档：")
+    for doc in docs:
+        print(f"  + {doc}")
+
+    skipped = [d for d in all_docs if d not in docs]
+    if skipped:
+        print()
+        print("不需要读取的文档：")
+        for doc in skipped:
+            print(f"  - {doc}")
+
+    return 0
+
 
 # ---------------------------------------------------------------------------
 # Pressure test commands
@@ -711,6 +887,18 @@ def build_parser() -> argparse.ArgumentParser:
     rewind.add_argument("target", help="previous | <stage-name> | <step-number>")
     rewind.add_argument("--note")
     rewind.set_defaults(func=command_rewind)
+
+    # -- Stage info & context queries --
+    stage_info = subparsers.add_parser("stage-info", help="Show entry/exit criteria, output files, and checks for a stage")
+    stage_info.add_argument("stage", choices=STAGES)
+    stage_info.set_defaults(func=command_stage_info)
+
+    rules_cmd = subparsers.add_parser("rules", help="Show stop conditions and confirmation gates")
+    rules_cmd.set_defaults(func=command_rules)
+
+    context_cmd = subparsers.add_parser("context", help="Show which documents to load for a given stage")
+    context_cmd.add_argument("stage", choices=STAGES)
+    context_cmd.set_defaults(func=command_context)
 
     # -- Pressure test commands --
     run_checks = subparsers.add_parser("run-checks", help="Initialize check session and output template")
