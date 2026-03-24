@@ -624,17 +624,17 @@ CONFIRMATION_SIGNALS: list[str] = [
 ]
 
 STAGE_DOCS: dict[str, list[str]] = {
-    "intake": ["CLAUDE.md", "CONTENT_FRAMEWORK.md"],
-    "killer_test": ["CLAUDE.md", "CONTENT_FRAMEWORK.md"],
-    "premise_test": ["CLAUDE.md", "CONTENT_FRAMEWORK.md"],
-    "idea_fission": ["CLAUDE.md", "CONTENT_FRAMEWORK.md"],
-    "evaluation": ["CLAUDE.md", "CONTENT_FRAMEWORK.md"],
-    "structure": ["CLAUDE.md", "CONTENT_FRAMEWORK.md", "PROJECT_RULES.md", "CONTENT_FRAMEWORK_structure.md"],
-    "outline": ["CLAUDE.md", "CONTENT_FRAMEWORK.md", "PROJECT_RULES.md", "CONTENT_FRAMEWORK_structure.md"],
-    "scene_pressure_test": ["CLAUDE.md", "CONTENT_FRAMEWORK.md", "PROJECT_RULES.md", "CONTENT_FRAMEWORK_structure.md"],
-    "prototype": ["CLAUDE.md", "CONTENT_FRAMEWORK.md", "PROJECT_RULES.md", "CONTENT_FRAMEWORK_structure.md", "AI_WRITING_SOP.md", "CONTENT_FRAMEWORK_writing.md"],
-    "expansion": ["CLAUDE.md", "CONTENT_FRAMEWORK.md", "PROJECT_RULES.md", "CONTENT_FRAMEWORK_structure.md", "AI_WRITING_SOP.md", "CONTENT_FRAMEWORK_writing.md"],
-    "review": ["CLAUDE.md", "CONTENT_FRAMEWORK.md", "PROJECT_RULES.md", "CONTENT_FRAMEWORK_structure.md", "AI_WRITING_SOP.md", "CONTENT_FRAMEWORK_writing.md"],
+    "intake": ["AGENTS.md", "CONTENT_FRAMEWORK.md"],
+    "killer_test": ["AGENTS.md", "CONTENT_FRAMEWORK.md"],
+    "premise_test": ["AGENTS.md", "CONTENT_FRAMEWORK.md"],
+    "idea_fission": ["AGENTS.md", "CONTENT_FRAMEWORK.md"],
+    "evaluation": ["AGENTS.md", "CONTENT_FRAMEWORK.md"],
+    "structure": ["AGENTS.md", "CONTENT_FRAMEWORK.md", "PROJECT_RULES.md", "CONTENT_FRAMEWORK_structure.md"],
+    "outline": ["AGENTS.md", "CONTENT_FRAMEWORK.md", "PROJECT_RULES.md", "CONTENT_FRAMEWORK_structure.md"],
+    "scene_pressure_test": ["AGENTS.md", "CONTENT_FRAMEWORK.md", "PROJECT_RULES.md", "CONTENT_FRAMEWORK_structure.md"],
+    "prototype": ["AGENTS.md", "CONTENT_FRAMEWORK.md", "PROJECT_RULES.md", "CONTENT_FRAMEWORK_structure.md", "AI_WRITING_SOP.md", "CONTENT_FRAMEWORK_writing.md"],
+    "expansion": ["AGENTS.md", "CONTENT_FRAMEWORK.md", "PROJECT_RULES.md", "CONTENT_FRAMEWORK_structure.md", "AI_WRITING_SOP.md", "CONTENT_FRAMEWORK_writing.md"],
+    "review": ["AGENTS.md", "CONTENT_FRAMEWORK.md", "PROJECT_RULES.md", "CONTENT_FRAMEWORK_structure.md", "AI_WRITING_SOP.md", "CONTENT_FRAMEWORK_writing.md"],
 }
 
 
@@ -697,7 +697,7 @@ def command_context(args: argparse.Namespace) -> int:
     docs = STAGE_DOCS.get(stage, [])
 
     all_docs = [
-        "CLAUDE.md", "AI_WRITING_SOP.md", "PROJECT_RULES.md",
+        "AGENTS.md", "AI_WRITING_SOP.md", "PROJECT_RULES.md",
         "CONTENT_FRAMEWORK.md", "CONTENT_FRAMEWORK_structure.md",
         "CONTENT_FRAMEWORK_writing.md", "README.md",
     ]

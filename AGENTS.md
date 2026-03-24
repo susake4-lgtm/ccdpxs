@@ -4,19 +4,19 @@
 
 它不追求一口气自动写完整本，而是把创作拆成可停顿、可确认、可修正、可回退、可留痕的阶段，让用户保留主导权，Agent 负责协助推进、诊断、整理和扩写。
 
-本文件不是新的阶段脚本入口，而是仓库级补充契约。它只补充三件事：
+本文件现在就是仓库的正式阶段入口。它负责三件事：
 
-- `CLAUDE.md` 与当前脚本入口的关系
+- 当前阶段入口与仓库权威链的关系
 - `IDEA_CARD` 的正式锚点口径
 - 上游替换后哪些内容只能停在 docs-only 参考层
 
-具体分工如下：`CLAUDE.md` 负责阶段入口与默认工作方式，`AI_WRITING_SOP.md` 负责流程推进，`PROJECT_RULES.md` 负责硬规则与文件纪律，`CONTENT_FRAMEWORK*.md` 负责内容标准。
+具体分工如下：`AGENTS.md` 负责阶段入口与默认工作方式，`AI_WRITING_SOP.md` 负责流程推进，`PROJECT_RULES.md` 负责硬规则与文件纪律，`CONTENT_FRAMEWORK*.md` 负责内容标准。
 
 ## 当前入口关系
 
-- `CLAUDE.md` 仍是当前 `guard.py context` 所对应的阶段入口文件
-- `AGENTS.md` 是仓库级补充契约，不等同于脚本自动加载
-- `guard.py` 未对齐前，不把 `AGENTS.md` 写成自动读取事实
+- `AGENTS.md` 现在是 `guard.py context` 所对应的正式阶段入口文件
+- `CLAUDE.md` 只保留为兼容壳，避免旧入口直接失效
+- 阶段实际读取顺序，以 `guard.py context` 输出为准
 
 ## 接口层补充契约
 
@@ -49,23 +49,26 @@ writing / review -> pass / rework / reject / hold
 
 1. `python3 scripts/guard.py status <project>` 确认当前阶段
 2. `python3 scripts/guard.py context <current-stage>` 确认当前阶段需要读取的文档
-3. 先按 `CLAUDE.md` 和 `guard.py context` 的输出进入当前阶段
-4. 需要确认仓库级边界、`IDEA_CARD` 口径或上游替换补充约束时，再补读 `AGENTS.md`
+3. 先按 `AGENTS.md` 和 `guard.py context` 的输出进入当前阶段
+4. 若看到旧入口 `CLAUDE.md`，转到 `AGENTS.md` 继续，不再把 `CLAUDE.md` 当权威源
 5. 继续旧项目时，再读该项目当前阶段总文件和最近的 `stage_logs/`
 
 需要确认仓库定位或目录约定时，查阅 `README.md`。
 
 ## 权威来源
 
-- **阶段入口与默认工作方式**：`CLAUDE.md`
+- **阶段入口与默认工作方式**：`AGENTS.md`
 - **流程推进**：`AI_WRITING_SOP.md`
 - **硬规则与停止条件**：`PROJECT_RULES.md`
 - **内容写法与阅读体验**：`CONTENT_FRAMEWORK.md` + `CONTENT_FRAMEWORK_structure.md` + `CONTENT_FRAMEWORK_writing.md`
-- **卡片最小契约**：`templates/project/IDEA_CARD.md`
-- **扩写继承契约**：`templates/project/EXPANSION_CONTEXT.md`
 - **仓库定位与命令**：`README.md`
 
 如果文档之间出现口径差异，按上面的职责边界解释，不自行混写或扩大范围。
+
+模板层补充：
+
+- `templates/project/IDEA_CARD.md` 是卡片模板，不是独立权威层
+- `templates/project/EXPANSION_CONTEXT.md` 是扩写继承模板，不是独立权威层
 
 ## 工作补充
 
@@ -103,17 +106,17 @@ writing / review -> pass / rework / reject / hold
 
 ## 框架调试模式
 
-如果用户说“优化流程”而不是“写故事”，沿用 `CLAUDE.md` 的框架调试模式，并补充一条仓库级约束：
+如果用户说“优化流程”而不是“写故事”，沿用本文件的框架调试模式，并补充一条仓库级约束：
 
 - 研究型新增默认先 docs 化，不先改 `guard.py`、`check_defs.py`、`check_engine.py`
 
 ## 发散模式
 
-如果用户说“我想聊聊这个脑洞”或处于 Intake / Idea Fission 阶段，沿用 `CLAUDE.md` 的发散模式，不在本文件重写一套。
+如果用户说“我想聊聊这个脑洞”或处于 Intake / Idea Fission 阶段，沿用本文件与阶段文档的发散模式，不再回看 `CLAUDE.md`。
 
 ## 用户标注约定
 
-用户在文稿中用 `##原文##意见##` 标注时，视为对该位置的直接修改意见或提问。具体解释与响应方式沿用 `CLAUDE.md`。
+用户在文稿中用 `##原文##意见##` 标注时，视为对该位置的直接修改意见或提问。具体解释与响应方式沿用仓库当前扩写规则。
 
 ## 扩写修改流程
 
@@ -123,8 +126,8 @@ writing / review -> pass / rework / reject / hold
 - 修改版：`scene-xx-v1.md`、`scene-xx-v2.md` ...
 - 终稿：`scene-xx-终稿.md`
 
-只改有标注的地方，不覆盖旧版本；详细留痕格式和流转规则沿用 `CLAUDE.md` 与 `PROJECT_RULES.md`。
+只改有标注的地方，不覆盖旧版本；详细留痕格式和流转规则沿用 `PROJECT_RULES.md` 与当前扩写模板。
 
 ## 其余协作边界
 
-操作边界、默认不做事项、必须暂停的情况和输出风格，沿用 `CLAUDE.md` 的现有约定，不在本文件重写一套。
+操作边界、默认不做事项、必须暂停的情况和输出风格，沿用本文件与 `PROJECT_RULES.md` 的现有约定，不再回看 `CLAUDE.md`。
