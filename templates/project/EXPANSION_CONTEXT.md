@@ -31,16 +31,16 @@
 
 | 字段 | 继承值 | 说明 |
 |------|--------|------|
-| title_direction | | |
-| one_line_core_conflict | | |
-| opening_direction | | |
+| 标题方向 | | |
+| 一句话核心冲突 | | |
+| 开篇爆点 | | |
 | 30% 卡点 | | |
-| middle_upgrade_logic | | |
-| ending_recovery | | |
-| emotional_arc | | |
-| character_behavior_pattern | | |
-| motif_set | | |
-| risk_checks | | |
+| 中段升级逻辑 | | |
+| 终局回收 | | |
+| 情绪曲线（Emotional Arc） | | |
+| 人物行为模式 | | |
+| 核心 motif / 设定清单 | | |
+| 风险检查 | | |
 
 ## 3. 从 03_Outline 继承
 
@@ -57,12 +57,3 @@
 | scene-01 | | | | | | | |
 | scene-02 | | | | | | | |
 | scene-03 | | | | | | | |
-
-## 5. 继承后保留的记录位
-
-| 记录项 | 当前值 | 说明 |
-|------|------|------|
-| scene-state-note | | |
-| scene-state-update | | |
-| scene-state-risk | | |
-| scene-state-confirmation | | |
