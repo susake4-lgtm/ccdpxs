@@ -208,11 +208,11 @@ def all_checks_complete(state: dict[str, Any], stage: str, *, chapter_num: str |
 
 
 # ---------------------------------------------------------------------------
-# 生成检查模板（供 Claude 填写）
+# 生成检查模板（供 Agent 填写）
 # ---------------------------------------------------------------------------
 
 def generate_check_template(stage: str) -> str:
-    """生成 Claude 填写的检查模板文本。"""
+    """生成 Agent 填写的检查模板文本。"""
     checks = get_checks_for_stage(stage)
     if not checks:
         return f"No checks defined for stage: {stage}"

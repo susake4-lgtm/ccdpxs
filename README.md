@@ -1,13 +1,13 @@
-# DPXS — Claude Code 版
+# DPXS
 
-知乎盐选短篇小说辅助系统，面向 Claude Code。
+知乎盐选短篇小说辅助系统，默认面向 Codex，兼容阶段式 Agent / LLM 协作。
 
 ## 这是什么
 
 一套 LLM 协作写作框架，把创作过程拆成阶段式推进：
 
 - 你负责方向、审美、取舍
-- Claude Code 负责裂变、诊断、整理、验证、扩写
+- Agent 负责裂变、诊断、整理、验证、扩写
 - 每一步都留痕，避免一路快跑后才发现基础是歪的
 
 特别强调：**保留知乎盐选式的快节奏、强钩子和情绪回收，同时减少提纲 prose、便利型转折、工具人角色和空情绪爽点。**
@@ -26,33 +26,32 @@ bash scripts/init_project.sh my-story "真假千金反杀"
 python3 scripts/guard.py status my-story
 ```
 
-3. 记录 Killer Test 结果：
+3. 确认当前阶段入口：
 
 ```bash
-python3 scripts/guard.py set-killer-test my-story pass
+python3 scripts/guard.py context intake
 ```
 
-4. 回退到上一步：
-
-```bash
-python3 scripts/guard.py rewind my-story previous
-```
-
-5. 开始和 Claude Code 对话：
+4. 按当前阶段入口开始协作：
 
 ```text
 我准备开始 output/my-story 这个项目。
 脑洞是：……
-先帮我做 intake 和脑洞裂变。
+先按 AGENTS.md 和当前阶段入口带我开始。
+```
+
+5. 常用状态命令：
+
+```bash
+python3 scripts/guard.py set-killer-test my-story pass
+python3 scripts/guard.py rewind my-story previous
 ```
 
 ## 仓库结构
 
 ```text
 .
-├── .claude/
-│   └── settings.json
-├── CLAUDE.md               # Claude Code 协作入口
+├── AGENTS.md               # 当前阶段入口与协作契约
 ├── README.md
 ├── AI_WRITING_SOP.md        # 流程：阶段如何推进
 ├── PROJECT_RULES.md         # 规则：什么能做、什么必须停
@@ -66,6 +65,8 @@ python3 scripts/guard.py rewind my-story previous
 │   └── init_project.sh      # 项目初始化
 ├── templates/
 │   └── project/             # 新项目模板
+├── compat/
+│   └── claude-code/         # Claude Code 历史兼容资产
 └── output/                  # 项目产物
     └── <project>/
         ├── PROJECT_INFO.md
@@ -90,7 +91,12 @@ python3 scripts/guard.py rewind my-story previous
 | `CONTENT_FRAMEWORK.md` | 核心写法目标（始终加载） |
 | `CONTENT_FRAMEWORK_structure.md` | 人物与冲突推进（Structure 起加载） |
 | `CONTENT_FRAMEWORK_writing.md` | 开篇硬指标、节奏密度、扩写标准（Prototype 起加载） |
-| `CLAUDE.md` | Claude Code 进入仓库后的默认工作方式 |
+| `AGENTS.md` | 当前阶段入口与默认工作方式 |
+
+## Compatibility
+
+- Claude Code 历史兼容资产已移到 `compat/claude-code/`
+- 仓库根目录的 `CLAUDE.md` 仅保留为兼容跳转壳，不视为当前入口
 
 ## 写作流程
 
