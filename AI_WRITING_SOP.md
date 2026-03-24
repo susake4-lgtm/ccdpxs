@@ -27,6 +27,12 @@ raw_idea -> classified -> ready / review_required / hold -> writing / review -> 
 - `rework`：当前层可修，留在本层回修
 - `reject`：当前路线不成立，不应继续以现状往下推
 
+这里的状态要按当前仓库的实际持久化方式理解：
+
+- `IDEA_CARD.status` 只记录卡片 / 准入侧状态，范围是 `raw_idea`、`classified`、`ready`、`review_required`、`hold` 或当前实现里的等价子集
+- `writing` / `review` / `pass` / `rework` / `reject` / `hold` 是当前阶段或当前草稿的处理结果，不是要回写成主卡片状态的新枚举
+- 这些结果分别落在阶段文件、`stage_logs/`、卡片备注 / hook 记录、复核记录里；`project_state.json` 只管当前阶段、确认和回退这类流程态，不承担完整接口结果模型
+
 不可擅改的卡片锚点至少包括：
 
 - `card_id`
@@ -82,6 +88,7 @@ raw_idea -> classified -> ready / review_required / hold -> writing / review -> 
 output/<project>/
 ├─ PROJECT_INFO.md
 ├─ IDEA_CARD.md              ← formal anchor
+├─ EXPANSION_CONTEXT.md
 ├─ project_state.json
 ├─ 00_Brainstorm.md
 ├─ 00_Creative_Chat_Log.md   ← 强制追加，版权留痕
