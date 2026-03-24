@@ -273,7 +273,7 @@ def blockers_for_target(
         "outline", "scene_pressure_test", "prototype", "expansion", "review",
     }:
         if not state.get("killer_test_passed", False):
-            blockers.append("Premise killer test has not passed yet.")
+            blockers.append("Killer test has not passed yet.")
 
     # Premise test gate: must pass before entering idea_fission or later
     if target_stage in {
@@ -420,7 +420,7 @@ def command_set_killer_test(args: argparse.Namespace) -> int:
         elif attempts >= 2:
             note = f"Killer test failed (attempt {attempts}) — recommend freeze"
         else:
-            note = f"Killer test failed (attempt {attempts}) — rewrite allowed"
+            note = f"Killer test failed (attempt {attempts}) — rework allowed"
 
     append_history(state, "killer_test", "killer_test", note)
     write_state(args.project, state)
@@ -542,7 +542,7 @@ def command_rewind(args: argparse.Namespace) -> int:
 
 
 # ---------------------------------------------------------------------------
-# Stage info & context queries (read-only, for Claude to query on demand)
+# Stage info & context queries (read-only, for agents to query on demand)
 # ---------------------------------------------------------------------------
 
 STAGE_EXIT_CRITERIA: dict[str, list[str]] = {
@@ -624,17 +624,17 @@ CONFIRMATION_SIGNALS: list[str] = [
 ]
 
 STAGE_DOCS: dict[str, list[str]] = {
-    "intake": ["CLAUDE.md", "CONTENT_FRAMEWORK.md"],
-    "killer_test": ["CLAUDE.md", "CONTENT_FRAMEWORK.md"],
-    "premise_test": ["CLAUDE.md", "CONTENT_FRAMEWORK.md"],
-    "idea_fission": ["CLAUDE.md", "CONTENT_FRAMEWORK.md"],
-    "evaluation": ["CLAUDE.md", "CONTENT_FRAMEWORK.md"],
-    "structure": ["CLAUDE.md", "CONTENT_FRAMEWORK.md", "PROJECT_RULES.md", "CONTENT_FRAMEWORK_structure.md"],
-    "outline": ["CLAUDE.md", "CONTENT_FRAMEWORK.md", "PROJECT_RULES.md", "CONTENT_FRAMEWORK_structure.md"],
-    "scene_pressure_test": ["CLAUDE.md", "CONTENT_FRAMEWORK.md", "PROJECT_RULES.md", "CONTENT_FRAMEWORK_structure.md"],
-    "prototype": ["CLAUDE.md", "CONTENT_FRAMEWORK.md", "PROJECT_RULES.md", "CONTENT_FRAMEWORK_structure.md", "AI_WRITING_SOP.md", "CONTENT_FRAMEWORK_writing.md"],
-    "expansion": ["CLAUDE.md", "CONTENT_FRAMEWORK.md", "PROJECT_RULES.md", "CONTENT_FRAMEWORK_structure.md", "AI_WRITING_SOP.md", "CONTENT_FRAMEWORK_writing.md"],
-    "review": ["CLAUDE.md", "CONTENT_FRAMEWORK.md", "PROJECT_RULES.md", "CONTENT_FRAMEWORK_structure.md", "AI_WRITING_SOP.md", "CONTENT_FRAMEWORK_writing.md"],
+    "intake": ["AGENTS.md", "CONTENT_FRAMEWORK.md"],
+    "killer_test": ["AGENTS.md", "CONTENT_FRAMEWORK.md"],
+    "premise_test": ["AGENTS.md", "CONTENT_FRAMEWORK.md"],
+    "idea_fission": ["AGENTS.md", "CONTENT_FRAMEWORK.md"],
+    "evaluation": ["AGENTS.md", "CONTENT_FRAMEWORK.md"],
+    "structure": ["AGENTS.md", "CONTENT_FRAMEWORK.md", "PROJECT_RULES.md", "CONTENT_FRAMEWORK_structure.md"],
+    "outline": ["AGENTS.md", "CONTENT_FRAMEWORK.md", "PROJECT_RULES.md", "CONTENT_FRAMEWORK_structure.md"],
+    "scene_pressure_test": ["AGENTS.md", "CONTENT_FRAMEWORK.md", "PROJECT_RULES.md", "CONTENT_FRAMEWORK_structure.md"],
+    "prototype": ["AGENTS.md", "CONTENT_FRAMEWORK.md", "PROJECT_RULES.md", "CONTENT_FRAMEWORK_structure.md", "AI_WRITING_SOP.md", "CONTENT_FRAMEWORK_writing.md"],
+    "expansion": ["AGENTS.md", "CONTENT_FRAMEWORK.md", "PROJECT_RULES.md", "CONTENT_FRAMEWORK_structure.md", "AI_WRITING_SOP.md", "CONTENT_FRAMEWORK_writing.md"],
+    "review": ["AGENTS.md", "CONTENT_FRAMEWORK.md", "PROJECT_RULES.md", "CONTENT_FRAMEWORK_structure.md", "AI_WRITING_SOP.md", "CONTENT_FRAMEWORK_writing.md"],
 }
 
 
@@ -697,7 +697,7 @@ def command_context(args: argparse.Namespace) -> int:
     docs = STAGE_DOCS.get(stage, [])
 
     all_docs = [
-        "CLAUDE.md", "AI_WRITING_SOP.md", "PROJECT_RULES.md",
+        "AGENTS.md", "AI_WRITING_SOP.md", "PROJECT_RULES.md",
         "CONTENT_FRAMEWORK.md", "CONTENT_FRAMEWORK_structure.md",
         "CONTENT_FRAMEWORK_writing.md", "README.md",
     ]
