@@ -273,7 +273,7 @@ def blockers_for_target(
         "outline", "scene_pressure_test", "prototype", "expansion", "review",
     }:
         if not state.get("killer_test_passed", False):
-            blockers.append("Premise killer test has not passed yet.")
+            blockers.append("Killer test has not passed yet.")
 
     # Premise test gate: must pass before entering idea_fission or later
     if target_stage in {
@@ -420,7 +420,7 @@ def command_set_killer_test(args: argparse.Namespace) -> int:
         elif attempts >= 2:
             note = f"Killer test failed (attempt {attempts}) — recommend freeze"
         else:
-            note = f"Killer test failed (attempt {attempts}) — rewrite allowed"
+            note = f"Killer test failed (attempt {attempts}) — rework allowed"
 
     append_history(state, "killer_test", "killer_test", note)
     write_state(args.project, state)
