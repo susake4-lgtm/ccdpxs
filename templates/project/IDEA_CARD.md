@@ -28,6 +28,13 @@
 - core_conflict:
 - relationship_frame:
 
+## 平台与母题锚点
+
+> 继承上方卡片元信息中的锚点，不在这里再开新字段面。
+
+> 如需补充，只写一条最小说明：
+> - inherit_note:
+
 ## premise / must_have / must_avoid
 
 > 这里只保留当前流程会实际消费的核心承诺。
@@ -37,26 +44,33 @@
 - must_have:
 - must_avoid:
 
-## admission / risk
+## 角色与冲突最小集
 
-> 这里只记录准入判断，不扩成更大的数据模型。
+> 只保留最小角色与冲突提示，不展开角色表。
 
+- role_note:
+- conflict_note:
+
+## ready / review_required / hold
+
+- ready_note:
 - review_required_reason:
 - hold_reason:
 - risk_flags:
 - fallback_action:
 
-## writing / review hooks
+## writing / review result hooks
 
 > 只保留一个 `review_focus` 入口和一个结果备注位。
 
 - review_focus:
 - result_note:
 
-## rework / downgrade
+## rework package / downgrade notes
 
 > 只保留当前能用的最小返工入口。
 
+- rework_note:
 - blocking_issues:
 - must_fix:
 - must_keep:
