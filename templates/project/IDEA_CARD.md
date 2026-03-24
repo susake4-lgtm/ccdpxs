@@ -19,58 +19,39 @@
 - target_platform:
 - lane:
 - confidence_level: high / medium / low
-- rule_refs:
-- source_idea_raw:
+- primary_motif:
+- secondary_motif:
 
 ## raw_idea / classified 摘要
 
 - raw_idea_summary:
-- classified_summary:
-- primary_motif:
-- secondary_motif:
 - core_conflict:
+- relationship_frame:
+- one_line_hook:
 
 ## premise / must_have / must_avoid
 
-- one_line_hook:
-- relationship_frame:
 - plot_mechanism:
 - emotion_promise:
 - must_have:
 - must_avoid:
-
-## 角色与冲突最小集
-
 - roles:
-- conflict_minset:
 
-## 平台与母题锚点
+## admission / risk
 
-- 继承上方锚点：`target_platform` / `lane` / `primary_motif` / `secondary_motif`
-- background:
-- mechanism_variant:
-- emotion_variant:
-- 标题方向:
-- 开篇方向:
-- 文风方向:
-- 结构方向:
-
-## ready / review_required / hold
-
-- ready_check:
 - review_required_reason:
 - hold_reason:
 - risk_flags:
 - fallback_action:
 
-## writing / review result hooks
+## writing / review hooks
 
-- 写作摘要:
-- 审核关注点:
-- 通过备注:
-- 返工备注:
-- 拒绝备注:
-- 暂停备注:
+- title_direction:
+- opening_direction:
+- style_direction:
+- structure_direction:
+- review_focus:
+- result_note:
 
 ## rework / downgrade
 
@@ -79,8 +60,6 @@
 - must_fix:
 - must_keep:
 - stop_condition:
-- downgrade_notes:
-- revision_instructions:
 
 ## 不可擅改锚点说明
 
