@@ -18,26 +18,28 @@
 - status: raw_idea / classified / ready / review_required / hold
 - target_platform:
 - lane:
-- confidence_level: high / medium / low
 - primary_motif:
 - secondary_motif:
 
 ## raw_idea / classified 摘要
 
-- raw_idea_summary:
+> 这里只保留足够让下游识别任务的最小摘要，不展开额外分析字段。
+
 - core_conflict:
 - relationship_frame:
-- one_line_hook:
 
 ## premise / must_have / must_avoid
+
+> 这里只保留当前流程会实际消费的核心承诺。
 
 - plot_mechanism:
 - emotion_promise:
 - must_have:
 - must_avoid:
-- roles:
 
 ## admission / risk
+
+> 这里只记录准入判断，不扩成更大的数据模型。
 
 - review_required_reason:
 - hold_reason:
@@ -46,16 +48,15 @@
 
 ## writing / review hooks
 
-- title_direction:
-- opening_direction:
-- style_direction:
-- structure_direction:
+> 只保留一个 `review_focus` 入口和一个结果备注位。
+
 - review_focus:
 - result_note:
 
 ## rework / downgrade
 
-- rework_round:
+> 只保留当前能用的最小返工入口。
+
 - blocking_issues:
 - must_fix:
 - must_keep:
