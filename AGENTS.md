@@ -15,7 +15,7 @@
 ## 当前入口关系
 
 - `AGENTS.md` 现在是 `guard.py context` 所对应的正式阶段入口文件
-- `CLAUDE.md` 只保留为兼容壳，避免旧入口直接失效
+- `CLAUDE.md` 只保留为兼容跳转壳；Claude Code 历史资产已收进 `compat/claude-code/`
 - 阶段实际读取顺序，以 `guard.py context` 输出为准
 
 ## 接口层补充契约
@@ -112,7 +112,7 @@ writing / review -> pass / rework / reject / hold
 
 ## 发散模式
 
-如果用户说“我想聊聊这个脑洞”或处于 Intake / Idea Fission 阶段，沿用本文件与阶段文档的发散模式，不再回看 `CLAUDE.md`。
+如果用户说“我想聊聊这个脑洞”或处于 Intake / Idea Fission 阶段，沿用本文件与阶段文档的发散模式。
 
 ## 用户标注约定
 
@@ -130,4 +130,4 @@ writing / review -> pass / rework / reject / hold
 
 ## 其余协作边界
 
-操作边界、默认不做事项、必须暂停的情况和输出风格，沿用本文件与 `PROJECT_RULES.md` 的现有约定，不再回看 `CLAUDE.md`。
+操作边界、默认不做事项、必须暂停的情况和输出风格，沿用本文件与 `PROJECT_RULES.md` 的现有约定。

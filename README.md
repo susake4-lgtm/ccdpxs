@@ -1,13 +1,13 @@
-# DPXS — Claude Code 版
+# DPXS
 
-知乎盐选短篇小说辅助系统，面向 Claude Code。
+知乎盐选短篇小说辅助系统，默认面向 Codex，兼容阶段式 Agent / LLM 协作。
 
 ## 这是什么
 
 一套 LLM 协作写作框架，把创作过程拆成阶段式推进：
 
 - 你负责方向、审美、取舍
-- Claude Code 负责裂变、诊断、整理、验证、扩写
+- Agent 负责裂变、诊断、整理、验证、扩写
 - 每一步都留痕，避免一路快跑后才发现基础是歪的
 
 特别强调：**保留知乎盐选式的快节奏、强钩子和情绪回收，同时减少提纲 prose、便利型转折、工具人角色和空情绪爽点。**
@@ -51,10 +51,7 @@ python3 scripts/guard.py rewind my-story previous
 
 ```text
 .
-├── .claude/
-│   └── settings.json
 ├── AGENTS.md               # 当前阶段入口与协作契约
-├── CLAUDE.md               # 兼容入口（转到 AGENTS.md）
 ├── README.md
 ├── AI_WRITING_SOP.md        # 流程：阶段如何推进
 ├── PROJECT_RULES.md         # 规则：什么能做、什么必须停
@@ -68,6 +65,8 @@ python3 scripts/guard.py rewind my-story previous
 │   └── init_project.sh      # 项目初始化
 ├── templates/
 │   └── project/             # 新项目模板
+├── compat/
+│   └── claude-code/         # Claude Code 历史兼容资产
 └── output/                  # 项目产物
     └── <project>/
         ├── PROJECT_INFO.md
@@ -93,7 +92,11 @@ python3 scripts/guard.py rewind my-story previous
 | `CONTENT_FRAMEWORK_structure.md` | 人物与冲突推进（Structure 起加载） |
 | `CONTENT_FRAMEWORK_writing.md` | 开篇硬指标、节奏密度、扩写标准（Prototype 起加载） |
 | `AGENTS.md` | 当前阶段入口与默认工作方式 |
-| `CLAUDE.md` | 兼容入口，旧路径请转到 `AGENTS.md` |
+
+## Compatibility
+
+- Claude Code 历史兼容资产已移到 `compat/claude-code/`
+- 仓库根目录的 `CLAUDE.md` 仅保留为兼容跳转壳，不视为当前入口
 
 ## 写作流程
 

@@ -542,7 +542,7 @@ def command_rewind(args: argparse.Namespace) -> int:
 
 
 # ---------------------------------------------------------------------------
-# Stage info & context queries (read-only, for Claude to query on demand)
+# Stage info & context queries (read-only, for agents to query on demand)
 # ---------------------------------------------------------------------------
 
 STAGE_EXIT_CRITERIA: dict[str, list[str]] = {
